@@ -1,6 +1,166 @@
 {
   "sourceLanguage" : "zh-Hans",
   "strings" : {
+  "同意并继续": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Agree and continue"
+        }
+      }
+    }
+  },
+  "已阅读": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "I have read the "
+        }
+      }
+    }
+  },
+  "，同意上述数据发送。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": " and agree to the data sharing described above."
+        }
+      }
+    }
+  },
+  "同意上述数据发送": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Allow the data sharing described above"
+        }
+      }
+    }
+  },
+  "已勾选": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Checked"
+        }
+      }
+    }
+  },
+  "未勾选": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Unchecked"
+        }
+      }
+    }
+  },
+  "发送的数据": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Data sent"
+        }
+      }
+    }
+  },
+  "接收方与数据用途": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Recipients and data use"
+        }
+      }
+    }
+  },
+  "确认下列服务后，可在底部统一授权。之后仍可在各连接设置中单独关闭。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Review the services below, then allow them together at the bottom. You can turn off each service separately in its connection settings later."
+        }
+      }
+    }
+  },
+  "地址未配置完整，本次不会授权；完善连接后可单独确认。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "The address is incomplete, so this connection will not be authorized. Complete its settings to review it separately."
+        }
+      }
+    }
+  },
+  "暂不授权": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Not now"
+        }
+      }
+    }
+  },
+  "请确认已配置服务的接收方和数据用途，并开启你要使用的服务。未允许的连接无法用于通话或同步；之后可在连接设置中修改。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Review the recipients and data use for your configured services, then enable the services you want to use. Connections without permission cannot be used for calls or sync. You can change these choices in each connection’s settings."
+        }
+      }
+    }
+  },
+  "确认服务数据发送": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Review service data sharing"
+        }
+      }
+    }
+  },
+  "继续使用已有连接前，请确认授权": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Review permissions before continuing with existing connections"
+        }
+      }
+    }
+  },
+  "来电提示": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Incoming call notice"
+        }
+      }
+    }
+  },
+  "检查连接授权": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Review connection permissions"
+        }
+      }
+    }
+  },
   "请求发起于": {
     "localizations": {
       "en": {

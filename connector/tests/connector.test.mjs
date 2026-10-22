@@ -94,7 +94,8 @@ before(async()=>{
   sql(readFileSync(new URL('../../supabase/migrations/202610190002_tincall_mcp_tools.sql',import.meta.url),'utf8'));
   sql(readFileSync(new URL('../../supabase/migrations/202610210001_tincall_mcp_voice_ack.sql',import.meta.url),'utf8'));
   sql(readFileSync(new URL('../../supabase/migrations/202610210002_tincall_mcp_conversation.sql',import.meta.url),'utf8'));
-  sql(readFileSync(new URL('../../supabase/migrations/202610220002_tincall_call_context.sql',import.meta.url),'utf8'));
+  sql(readFileSync(new URL('../../supabase/migrations/202610200003_tincall_mcp_oauth.sql',import.meta.url),'utf8'));
+  sql(readFileSync(new URL('../../supabase/migrations/202610220002_tincall_mcp_safety.sql',import.meta.url),'utf8'));
   sql(readFileSync(new URL('../../supabase/migrations/202610200001_tincall_schedule_controls.sql',import.meta.url),'utf8'));
   }
   upstream=createServer(async(req,res)=>{
@@ -358,15 +359,17 @@ test('MCP dial waits for answer and returns first-call instructions once without
   const answered=await dial;
   assert.equal(answered.isError,false);assert.match(answered.content[0].text,/已接通/);assert.match(answered.content[0].text,/Speak naturally/);
   assert.equal(answered.structuredContent,undefined);
+  assert.equal(answered.content.find(block=>block.text?.startsWith('call: '))?.text,'call: '+callReference(call.id));
   assert.doesNotMatch(JSON.stringify(answered),/reply_to|epoch|sequence|cursor|收到对方|回复已接收/);
   const beforeInvalid=(await api(`/calls/${call.id}/events`)).body.events;
   const invalid=await tool('tincall_reply',{reply_to:crypto.randomUUID(),text:'Hello there.',wait_for_input:false});
   assert.deepEqual(invalid,{content:[{type:'text',text:'回复未发送：请按当前工具定义提交正文和必要参数，移除多余参数后重试。'}],isError:true});
   assert.deepEqual((await api(`/calls/${call.id}/events`)).body.events,beforeInvalid,'a rejected reply must not be sent');
   const sent=await tool('tincall_reply',{call:callReference(call.id),text:'Hello there.',wait_for_input:false});
-  assert.equal(sent.isError,false);assert.equal(sent.content[0].text,'已发送。');assert.equal(sent.content[1].text,'call: '+callReference(call.id));
+  assert.equal(sent.isError,false);assert.deepEqual(sent.content,[{type:'text',text:'已发送。'}]);
   const timeout=await tool('tincall_wait',{timeout_seconds:1});
   assert.match(timeout.content[0].text,/尚未回复/);assert.match(timeout.content[0].text,/tincall_wait/);assert.doesNotMatch(timeout.content[0].text,/朗读要求|Speak naturally|get_call/);
+  assert.equal(timeout.content.find(block=>block.text?.startsWith('call: '))?.text,'call: '+callReference(call.id),'discovering a call without a marker must return it');
   assert.equal((await tool('tincall_get_call',{call_id:call.id},'test-role')).isError,true);
   await tool('tincall_end',{call:callReference(call.id)});
   const events=(await api(`/calls/${call.id}/events`)).body.events;
@@ -403,7 +406,9 @@ test('MCP first reply waits for new input instead of replaying the answer',async
       await new Promise(resolve=>setTimeout(resolve,50));
       assert.equal(settled,false,'submitting a reply must not return an opening greeting');
       await api(`/calls/${id}/input`,mutation({message_id:crypto.randomUUID(),epoch:0,text:'Synthetic next question.'}));
-      const text=(await pending).content[0].text;
+      const result=await pending;
+      assert.equal(result.content.some(block=>block.text?.startsWith('call: ')),false,'a reply in a known call must not repeat its marker');
+      const text=result.content[0].text;
       assert.equal(text.split('\n\n')[0],'小白：\nSynthetic next question.');
       assert.doesNotMatch(text,/打招呼/);
       if(readFirst)assert.doesNotMatch(text,/朗读要求/);
@@ -440,7 +445,7 @@ test('MCP wait and reply keep waiting through playback interruption',async t=>{
       }
       await new Promise(resolve=>setTimeout(resolve,1100));
       await api(`/calls/${id}/input`,mutation({message_id:crypto.randomUUID(),epoch:1,text:'Synthetic next sentence.'}));
-      assert.deepEqual((await pending).content,[{type:'text',text:'小白：\nSynthetic next sentence.'},{type:'text',text:'call: '+callReference(id)}]);
+      assert.deepEqual((await pending).content,[{type:'text',text:'小白：\nSynthetic next sentence.'}]);
       const ending=tool('tincall_wait',{timeout_seconds:3});
       await api(`/calls/${id}/end`,mutation({epoch:2}));
       assert.equal((await ending).content[0].text,'通话已结束。');
@@ -781,6 +786,38 @@ test('event wait is capped at 25 seconds',async(t)=>{
   await api(`/calls/${callID}/end`,mutation({epoch:0,reason:'hangup'}));
 });
 
+
+test('MCP history uses short call IDs for lookup and both pagination links',async()=>{
+  const headers={Accept:'application/json, text/event-stream'};
+  const tool=async(name,args={},token='test-role')=>(await api('/mcp',{jsonrpc:'2.0',id:1,method:'tools/call',params:{name,arguments:args}},token,headers)).body.result;
+  const ids=[];
+  for(let index=0;index<3;index++) {
+    const id=crypto.randomUUID();ids.push(id);
+    await store.command(owner,'call.create',mutation({call_id:id,contact_id:'one',source:'mcp'}));
+    for(let message=0;message<3;message++)await store.command(owner,'call.input',mutation({call_id:id,message_id:crypto.randomUUID(),epoch:message,text:`History ${index}/${message}`,mode:'tools'}));
+    await store.command(owner,'call.end',mutation({call_id:id,epoch:3}));
+  }
+  const list=await tool('tincall_list_calls',{limit:2});
+  assert.equal(list.isError,false);
+  const text=list.content[0].text;
+  const markers=[...text.matchAll(/call_id: ([^\n]+)/g)].map(match=>match[1]);
+  assert.equal(markers.length,2);for(const marker of markers)assert.match(marker,/^[A-Za-z0-9_-]{8}$/);
+  const nextList=JSON.parse(text.split('还有通话记录：tincall_list_calls ')[1]);
+  assert.match(nextList.before.call_id,/^[A-Za-z0-9_-]{8}$/);
+  const older=await tool('tincall_list_calls',{...nextList,limit:2});
+  assert.equal(older.isError,false);
+  assert.ok(older.content[0].text.includes('call_id: '));
+  for(const marker of markers)assert.equal(older.content[0].text.includes('call_id: '+marker),false);
+  const history=await tool('tincall_get_call',{call_id:markers[0],limit:1});
+  assert.equal(history.isError,false);
+  assert.equal(history.content.find(block=>block.text?.startsWith('call: '))?.text,'call: '+markers[0]);
+  const nextMessages=JSON.parse(history.content[0].text.split('还有更早的消息：tincall_get_call ')[1]);
+  assert.equal(nextMessages.call_id,markers[0]);
+  const earlier=await tool('tincall_get_call',{...nextMessages,limit:1});
+  assert.equal(earlier.isError,false);assert.notEqual(earlier.content[0].text,history.content[0].text);
+  assert.equal((await tool('tincall_get_call',{call_id:markers[0]},'test-other')).isError,true);
+  assert.equal((await tool('tincall_get_call',{call_id:ids[0]})).isError,false,'existing UUID lookups remain valid');
+});
 
 test('MCP recent calls limits after identity filtering and summary uploads replace durably',async()=>{
   const headers={Accept:'application/json, text/event-stream','MCP-Protocol-Version':'2025-11-25'};

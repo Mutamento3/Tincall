@@ -15,9 +15,9 @@
 | `tincall_end` | 必填 `call` | 结束标记对应的原通话，要求手机播放完已收到回复后挂断；手机手动挂断仍立即停止 |
 | `tincall_list_calls` | 可选 `limit`、`before` | 列出当前身份的历史通话，默认 10 条、最多 50 条；用返回的翻页信息继续，再用 get_call 读正文 |
 
-参数以实际 `tools/list` 为准。接通、发言与等待结果提供一行 `call: XXXXXXXX`；模型只需原样带回这个 8 字符标记，不抄写 UUID、轮次或游标。服务端在当前身份范围内映射原通话；标记未知、有歧义或原通话已经结束时拒绝操作，不改选新通话。图片返回标准 MCP image content，应读取实际内容。
+参数以实际 `tools/list` 为准。首次接通、发现通话及显式查询时提供一行 `call: XXXXXXXX`；模型在同一通话里复用这个 8 字符标记，不抄写 UUID、轮次或游标，后续正常消息不重复附带标记。服务端在当前身份范围内映射原通话；标记未知、有歧义或原通话已经结束时拒绝回复／挂断，不改选新通话。已结束通话仍可查询历史。图片返回标准 MCP image content，应读取实际内容。
 
-正常通话：`call → reply({call, text}) → reply({call, text}) → …`，其中 `call` 是同一通电话返回的短标记。手机已拨出时，可用 `get_call` 确认状态或 `wait` 等待输入。告别：`reply({call, text, wait_for_input:false}) → end({call})`。更新现有服务时应用新增迁移与函数，并在平台刷新工具定义或重新连接；不要换用新标记重试旧任务。
+正常通话：`call → reply({call, text}) → reply({call, text}) → …`，其中 `call` 是首次接通或发现通话时返回的八位短标记。同一通话后续的 reply 和带标记的 wait 只返回消息，不重复附加 ID；省略 wait_for_input 默认等待，仅显式 false 时立即返回。手机已拨出时，可用 `get_call` 确认状态或 `wait` 等待输入。历史列表与翻页也使用八位 ID，可用 `get_call({call_id: "XXXXXXXX"})` 查询，查询结果仍会给出该通话标记。告别：`reply({call, text, wait_for_input:false}) → end({call})`。更新现有服务时应用新增迁移与函数，并在平台刷新工具定义或重新连接；不要换用新标记重试旧任务。
 
 ## 等待、播放与失败
 

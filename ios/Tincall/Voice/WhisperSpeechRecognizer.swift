@@ -15,6 +15,7 @@ final class WhisperSpeechRecognizer: SpeechRecognizer {
     private let session: URLSession
     private var running = false
     private var paused = false
+    private var capacityPaused = false
     private var generation = 0
     private var inputBuffer = WhisperInputBuffer()
     private var requestTask: Task<Void, Never>?
@@ -77,13 +78,19 @@ final class WhisperSpeechRecognizer: SpeechRecognizer {
         generation += 1
         requestTask?.cancel(); requestTask = nil
         inputBuffer = WhisperInputBuffer()
+        capacityPaused = false
+        capture.setPaused(paused)
         capture.reset()
     }
 
     private func accept(_ value: (audio: Data, hasSpeech: Bool)) async {
-        guard running, !paused else { return }
+        guard running, !paused, !capacityPaused else { return }
         do {
             try inputBuffer.append(value.audio, hasSpeech: value.hasSpeech)
+            if inputBuffer.isFull {
+                capacityPaused = true
+                capture.setPaused(true)
+            }
             pump()
         } catch { await fail(error) }
     }
@@ -126,6 +133,8 @@ final class WhisperSpeechRecognizer: SpeechRecognizer {
                     if !result.text.isEmpty { await self.callback?(result.text, true, result.pcm) }
                     // Core can start playback and pause/reset during the final callback.
                     guard self.generation == expected, self.running, !self.paused, !Task.isCancelled else { return }
+                    self.capacityPaused = false
+                    self.capture.setPaused(false)
                     self.onReset?()
                 } else { self.pump() }
             } catch {

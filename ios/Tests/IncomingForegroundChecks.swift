@@ -181,10 +181,17 @@ private final class AnswerCallController: CXCallController, @unchecked Sendable 
         let client = ExternalCallClient(), provider = AnswerProvider(configuration: CXProviderConfiguration())
         let controller = IncomingCallController(client: client, defaults: defaults, provider: provider)
         let connection = ConnectionProfile(name: "Synthetic", provider: .genericConnector, endpoint: URL(string: "https://synthetic.invalid"))
-        let role = CallRole(name: "Synthetic")
+        let speech = ConnectionProfile(name: "On-device", provider: .appleSpeech)
+        let voice = ConnectionProfile(name: "Synthetic voice", provider: .elevenLabs)
+        var role = CallRole(name: "Synthetic")
+        role.callMode = .mcp; role.sttConnectionID = speech.id; role.ttsConnectionID = voice.id
+        DataSharingConsent.rememberDeviceBinding(connection, defaults: defaults)
         var ringing = 0
         controller.canAcceptCall = { true }
-        controller.canUseConnections = { _, _ in false }
+        controller.canUseConnections = { role, connector in
+            DataSharingConsent.permitsIncomingCall(role: role, connector: connector,
+                connections: [connection, speech, voice], defaultSTT: nil, defaults: defaults)
+        }
         controller.onResolveRole = { _, _, _ in role }
         controller.onRing = { _, _, _ in ringing += 1 }
         controller.monitorForeground(connections: [connection], active: true)
@@ -193,8 +200,19 @@ private final class AnswerCallController: CXCallController, @unchecked Sendable 
         try await until { provider.ended }
         precondition(ringing == 0 && controller.answeringCall == nil)
         precondition(controller.errorMessage?.contains("尚未授权") == true)
+        precondition(DataSharingConsent.needsReview(connection, defaults: defaults)
+            && DataSharingConsent.needsReview(voice, defaults: defaults), "An upgraded configuration must be offered consent review")
+        controller.dismissError()
+        precondition(controller.errorMessage == nil)
+        DataSharingConsent.setAllowed(true, for: connection, defaults: defaults)
+        DataSharingConsent.setAllowed(true, for: voice, defaults: defaults)
+        provider.ended = false
+        client.callbacks[connection.id]?(ExternalCallState())
+        try await until { ringing == 1 }
+        precondition(!provider.ended, "Explicit consent must restore incoming preparation without changing the existing binding")
+        controller.providerDidReset(provider)
         controller.monitorForeground(connections: [], active: false)
-        print("PASS: missing data-sharing permission ends the system invitation before ringing preparation or answering")
+        print("PASS: legacy binding without grants is blocked with an error and needs review; explicit consent restores ringing preparation")
     }
 
     @MainActor static func checkInitialCallerHandle() async throws {

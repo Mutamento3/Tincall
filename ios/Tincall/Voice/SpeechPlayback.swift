@@ -44,6 +44,7 @@ final class SpeechPlayback {
     private var result: Result<Void, Error>?
     private var completion: CheckedContinuation<Void, Error>?
     private var engine: AVAudioEngine?
+    private var engineObservationID = UUID()
     private var player: AVAudioPlayerNode?
     private var routeObserver: NSObjectProtocol?
     private var engineConfigurationObserver: NSObjectProtocol?
@@ -391,7 +392,7 @@ final class SpeechPlayback {
                 log("request_start", index: index)
                 let bytes: URLSession.AsyncBytes
                 let response: URLResponse
-                do { (bytes, response) = try await session.bytes(for: request) }
+                do { (bytes, response) = try await session.bytes(for: request, delegate: SpeechHTTPNoRedirects()) }
                 catch {
                     requestLog.fail(error); requestLog.finish()
                     try Task.checkCancellation()
@@ -505,7 +506,7 @@ final class SpeechPlayback {
         requestLog.requestBody(request.httpBody)
         requestLog.request(segment.value.text)
         log("request_start", index: index)
-        let (bytes, response) = try await session.bytes(for: request)
+        let (bytes, response) = try await session.bytes(for: request, delegate: SpeechHTTPNoRedirects())
         requestLog.response(response)
         guard let response = response as? HTTPURLResponse else { throw TincallError(message: String(localized: "MiniMax 返回了无效响应")) }
         log("http_response", index: index, status: response.statusCode)
@@ -736,9 +737,11 @@ final class SpeechPlayback {
         self.engine = engine
         self.player = player
         let expectedGeneration = generation
-        engineConfigurationObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self, weak engine] _ in
-            Task { @MainActor [weak self, weak engine] in
-                guard let self, let engine, self.engine === engine, self.result == nil,
+        let observationID = UUID()
+        engineObservationID = observationID
+        engineConfigurationObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.engineObservationID == observationID, let engine = self.engine, self.result == nil,
                       self.generation == expectedGeneration, !engine.isRunning else { return }
                 self.outputConfigurationChanged = true
                 guard !self.isAudioInterrupted else { return }

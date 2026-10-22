@@ -25,6 +25,8 @@ struct TincallRootView: View {
     @State private var isRecordDetailVisible = false
     @State private var isSettingsSubpageVisible = false
     @State private var callDraft = ""
+    @State private var dataSharingReviewConnections: [ConnectionProfile] = []
+    @State private var showsDataSharingReview = false
     private var callActivity: CallActivityController { runtime.callActivity }
     @State private var configurationIssue: String? = String(localized: "请选择联系人并配置连接")
 
@@ -194,11 +196,31 @@ struct TincallRootView: View {
         .fullScreenCover(isPresented: Binding(get: { runtime.access.showsUnlock }, set: { runtime.access.showsUnlock = $0 })) {
             NavigationStack { CallAccessScreen(isModal: true) }
         }
+        .sheet(isPresented: $showsDataSharingReview, onDismiss: {
+            runtime.refreshDataSharingConsent()
+            refreshConfiguration()
+        }) {
+            NavigationStack { ConnectionDataSharingReview(connections: dataSharingReviewConnections) }
+        }
+        .alert("来电提示", isPresented: Binding(get: {
+            !showsDataSharingReview && runtime.incoming.errorMessage != nil
+        }, set: { if !$0 { runtime.incoming.dismissError() } })) {
+            if configuration?.connections.contains(where: { !DataSharingConsent.isAllowed($0) }) == true {
+                Button("检查连接授权") {
+                    runtime.incoming.dismissError()
+                    dataSharingReviewConnections = configuration?.connections.filter { !DataSharingConsent.isAllowed($0) } ?? []
+                    showsDataSharingReview = !dataSharingReviewConnections.isEmpty
+                }
+            }
+            Button("好", role: .cancel) { runtime.incoming.dismissError() }
+        } message: { Text(runtime.incoming.errorMessage ?? "") }
         .task {
             if configuration == nil { load() }
             selectedRoleID = coordinator?.isCallActive == true ? coordinator?.record?.roleID : configuration?.roles.first?.id
             refreshConfiguration()
             presentActiveCall()
+            dataSharingReviewConnections = configuration?.connections.filter { DataSharingConsent.needsReview($0) } ?? []
+            showsDataSharingReview = !dataSharingReviewConnections.isEmpty
             #if DEBUG
             let arguments = ProcessInfo.processInfo.arguments
             if arguments.contains("-TincallOpenSettings") || arguments.contains("-TincallOpenRequestLogs") || arguments.contains("-TincallOpenRequestLogFailedCall") {
@@ -354,7 +376,7 @@ struct TincallRootView: View {
             isMuted: coordinator.isMuted,
             canInterrupt: coordinator.canInterrupt,
             errorMessage: isAnswering ? nil : (coordinator.errorMessage ?? callActivity.errorMessage),
-            onRetrySaving: coordinator.hasUnsavedAudio || !coordinator.savingCallIDs.isEmpty ? { coordinator.retrySaving() } : nil,
+            onRetrySaving: !coordinator.savingCallIDs.isEmpty ? { coordinator.retrySaving() } : nil,
             onConfigure: { showsConfiguration = true },
             onStart: {
                 guard let role = resolvedCallRole(role, configuration: configuration) else { return }

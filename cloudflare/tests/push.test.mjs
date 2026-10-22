@@ -114,7 +114,8 @@ test('Worker registry isolates installations and owners, persists rotations, ded
   assert.equal(sent, 1);
   assert.equal((await post('/push', { ...payload, call_id: crypto.randomUUID() })).status, 200);
   const rotated = await post('/devices', { ...registration, device_token: 'b'.repeat(64), environment: 'production' });
-  assert.equal(rotated.body.binding_id, registered.body.binding_id);
+  assert.notEqual(rotated.body.binding_id, registered.body.binding_id);
+  assert.equal((await post('/push', { ...payload, binding_id: rotated.body.binding_id, call_id: crypto.randomUUID() })).status, 200);
   await post('/devices/remove', { owner_id: owner, device_id: device });
   assert.equal((await post('/push', payload)).status, 404);
   const next = await post('/devices', registration);
@@ -158,4 +159,36 @@ test('immediate redial delivers new calls without a cooldown while duplicate ret
   for (let count = 2; count < 12; count++) assert.equal((await post('/push', { ...call, call_id: crypto.randomUUID() })).status, 200);
   assert.equal((await post('/push', redial)).status, 200);
   assert.equal(sent, 12);
+});
+
+test('Worker token refresh survives a late APNs expiry and renews disabled registrations', async t => {
+  const bindings = registryBindings();
+  t.after(() => bindings.close());
+  let started, releaseOld;
+  const sending = new Promise(resolve => { started = resolve; });
+  t.mock.method(globalThis, 'fetch', async url => {
+    if (String(url).endsWith('a'.repeat(64))) { started(); return new Promise(resolve => { releaseOld = resolve; }); }
+    return new Response(null, {status: 200});
+  });
+  async function post(path, value) {
+    const response = await worker.fetch(new Request(`https://synthetic.invalid${path}`, {method: 'POST',
+      headers: {authorization: `Bearer ${token}`, 'content-type': 'application/json'}, body: JSON.stringify(value)
+    }), {...env, PUSH_REGISTRIES: bindings});
+    return {status: response.status, body: await response.json()};
+  }
+  const registration = {owner_id: crypto.randomUUID(), device_id: crypto.randomUUID(), device_token: 'a'.repeat(64), environment: 'sandbox'};
+  const original = (await post('/devices', registration)).body;
+  assert.equal((await post('/devices', registration)).body.binding_id, original.binding_id);
+  const payload = {owner_id: registration.owner_id, binding_id: original.binding_id, call_id: crypto.randomUUID(), contact_id: 'synthetic', source: 'mcp', event: 'incoming_call'};
+  const running = post('/push', payload);
+  await sending;
+  const refreshed = (await post('/devices', {...registration, device_token: 'b'.repeat(64)})).body;
+  releaseOld(new Response(null, {status: 410}));
+  assert.equal((await running).body.error.code, 'apns_device_expired');
+  assert.notEqual(refreshed.binding_id, original.binding_id, 'connector cleanup must be able to distinguish refreshed routing');
+  assert.equal((await post('/push', {...payload, binding_id: refreshed.binding_id})).status, 200);
+  t.mock.method(globalThis, 'fetch', async () => new Response(null, {status: 410}));
+  await post('/push', {...payload, binding_id: refreshed.binding_id, call_id: crypto.randomUUID()});
+  const renewed = (await post('/devices', {...registration, device_token: 'b'.repeat(64)})).body;
+  assert.notEqual(renewed.binding_id, refreshed.binding_id, 're-enabling a disabled registration needs a new binding');
 });

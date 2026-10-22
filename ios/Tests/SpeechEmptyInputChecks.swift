@@ -30,6 +30,28 @@ private final class EmptySpeechProtocol: URLProtocol, @unchecked Sendable {
     override func stopLoading() {}
 }
 
+private final class RedirectSpeechProtocol: URLProtocol, @unchecked Sendable {
+    static let requests = CapturedSpeechRequests()
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override func startLoading() {
+        Self.requests.append(Data(request.url!.host!.utf8))
+        if request.url!.host == "redirect.invalid" {
+            client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+            return
+        }
+        let destination = URL(string: "https://redirect.invalid/receiver")!
+        let response = HTTPURLResponse(url: request.url!, statusCode: 307, httpVersion: nil,
+                                       headerFields: ["Location": destination.absoluteString])!
+        var redirected = request
+        redirected.url = destination
+        client?.urlProtocol(self, wasRedirectedTo: redirected, redirectResponse: response)
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+    override func stopLoading() { }
+}
+
 private final class CapturedSpeechRequests: @unchecked Sendable {
     private let lock = NSLock()
     private var bodies: [Data] = []
@@ -46,6 +68,28 @@ struct SpeechEmptyInputChecks {
             fatalError("empty-input queue did not finish")
         }
         defer { deadline.cancel() }
+        if CommandLine.arguments.contains("--redirects-only") {
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.protocolClasses = [RedirectSpeechProtocol.self]
+            let session = URLSession(configuration: configuration)
+            defer { session.invalidateAndCancel() }
+            let settings: [SpeechSynthesisConfiguration] = [
+                .elevenLabs(ElevenLabsConfiguration(elevenLabsAPIKey: "synthetic-key", elevenLabsVoiceID: "synthetic", elevenLabsModel: "eleven_v4")),
+                .miniMax(MiniMaxConfiguration(apiKey: "synthetic-key", model: "speech-02-hd", voiceID: "synthetic", endpoint: URL(string: "https://minimax.invalid/v1/t2a_v2")!))
+            ]
+            for setting in settings {
+                let playback = SpeechPlayback(session: session)
+                try playback.begin(settings: setting)
+                try playback.appendText("Synthetic private sentence.", final: true)
+                var failed = false
+                do { try await playback.waitUntilFinished() } catch { failed = true }
+                precondition(failed, "redirect must surface as an HTTP failure")
+            }
+            let hosts = RedirectSpeechProtocol.requests.all.map { String(decoding: $0, as: UTF8.self) }
+            precondition(hosts.count == 2 && !hosts.contains("redirect.invalid"), "TTS must never forward text or credentials to the redirect destination")
+            print("PASS: ElevenLabs and MiniMax production request paths reject redirects before forwarding content")
+            return
+        }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [EmptySpeechProtocol.self]
         let session = URLSession(configuration: configuration)

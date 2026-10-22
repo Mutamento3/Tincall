@@ -38,14 +38,6 @@ struct CloudDeploymentGuide<NextSteps: View>: View {
             }
             else {
                 oneClickDeployment
-                Section {
-                    Text("Supabase 会接收项目部署配置及必要的账户标识。部署的 Tincall 服务按所启用功能接收通话输入、联系人设定、图片与路由信息；记录和录音同步需另外开启。")
-                        .font(.footnote).foregroundStyle(.secondary)
-                    if let ref = normalizedProjectRef { Text(verbatim: "https://\(ref).supabase.co").font(.caption) }
-                    Toggle("允许部署并向所选项目发送数据", isOn: $allowsDeploymentSharing)
-                    Link("隐私政策", destination: DataSharingConsent.privacyURL)
-                } header: { SettingsSectionHeading(title: String(localized: "数据发送授权"), caption: "PRIVACY") }
-                .disabled(deploymentRequested)
             }
         }
         .onChange(of: deploymentProjectRef) { _, _ in allowsDeploymentSharing = false }
@@ -78,6 +70,7 @@ struct CloudDeploymentGuide<NextSteps: View>: View {
     private var canDeploy: Bool {
         !accessToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && normalizedProjectRef != nil
+            && allowsDeploymentSharing
             && !deploymentRequested && !deployment.isDeploying && !deploymentFinished
     }
 
@@ -178,6 +171,13 @@ struct CloudDeploymentGuide<NextSteps: View>: View {
                 .buttonStyle(.plain).disabled(!canDeploy)
                 Text("完成后自动保存连接。\n更新会保留原有数据和连接令牌。")
                     .font(.footnote).foregroundStyle(.secondary)
+                DisclosureGroup("接收方与数据用途") {
+                    Text("Supabase 会接收项目部署配置及必要的账户标识。部署的 Tincall 服务按所启用功能接收通话输入、联系人设定、图片与路由信息；记录和录音同步需另外开启。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    if let ref = normalizedProjectRef { Text(verbatim: "https://\(ref).supabase.co").font(.caption) }
+                }
+                DataSharingAgreementRow(isOn: $allowsDeploymentSharing)
+                    .disabled(deploymentRequested || deploymentFinished)
                 if deploymentRequested,
                    let current = deployment.progress.first(where: { $0.status == .running }) {
                     Text(LocalizedStringKey(current.step.rawValue))

@@ -107,6 +107,26 @@ extension CallCoordinator {
             endFromExternal(identity, afterPlayback: event.payload.reason == "mcp_hangup")
             return
         }
+        // Received complete replies remain durable while preceding audio drains.
+        // A submitted start carries no content and must not replace that audio.
+        if event.payload.submitted == true, records[id]?.callMode == .mcp,
+           externalReplyIDs[id] != event.payload.reply_id,
+           !textOnly, generation == .completed, playback != .drained, playback != .failed,
+           records[id]?.externalPendingControl?.endsCall != true {
+            if event.type == "reply.started" { return }
+            if event.type == "reply.completed", let replyID = event.payload.reply_id, var value = records[id] {
+                guard let text = event.payload.text else { throw TincallError(message: String(localized: "连接端完成事件缺少正文")) }
+                let message = CallMessage(id: value.messages.contains { $0.id == replyID } ? UUID() : replyID,
+                                          turnID: UUID(), role: .assistant, text: text, status: .completed)
+                value.messages.append(message)
+                value.externalEpoch = max(value.externalEpoch ?? 0, event.epoch)
+                try save(value)
+                records[id] = value
+                externalReplyQueue.append((VoiceTurnID(session: identity, turnID: message.turnID, messageID: message.id), replyID, event.payload.input_id))
+                publish(id)
+                return
+            }
+        }
         // A complete MCP submission is a new message, even after playback was interrupted.
         if (event.type == "reply.started" || event.type == "reply.completed"), event.payload.submitted == true,
            records[id]?.callMode == .mcp,
@@ -200,6 +220,52 @@ extension CallCoordinator {
             beginQueuedInput()
         default:
             throw TincallError(message: String(localized: "连接端返回不支持的回复事件"))
+        }
+    }
+
+    @discardableResult
+    func beginQueuedExternalReply() -> Bool {
+        guard let identity = session, phase == .active, !textOnly,
+              playback == .drained || playback == .failed else { return false }
+        while !externalReplyQueue.isEmpty {
+            let next = externalReplyQueue.removeFirst()
+            guard next.turn.session == identity,
+                  let message = records[identity.callID]?.messages.first(where: { $0.id == next.turn.messageID }) else { continue }
+            turns[identity.callID] = next.turn
+            externalReplyIDs[identity.callID] = next.replyID
+            externalInputIDs[identity.callID] = next.inputID
+            mutate(identity.callID) { $0.externalReplyID = next.replyID }
+            generation = .completed
+            playback = .synthesizing
+            currentPlaybackCaption = nil
+            do {
+                try voice.beginReply(next.turn)
+                try voice.appendReply(message.text, to: next.turn)
+                try voice.finishReply(next.turn)
+                return true
+            } catch {
+                // The voice service may emit failure synchronously before throwing.
+                // Its callback can already have advanced the queue or ended the call.
+                guard session == identity, turns[identity.callID] == next.turn else { return true }
+                playback = .failed
+                errorMessage = safeMessage(error)
+                voice.interruptReply(next.turn)
+                playback = .failed
+                if externalEndSession == identity { endFromExternal(identity); return true }
+            }
+        }
+        return false
+    }
+
+    func discardQueuedExternalReplies(reason: MessageInterruption) {
+        let queued = externalReplyQueue
+        externalReplyQueue.removeAll()
+        for next in queued {
+            mutate(next.turn.session.callID) { value in
+                guard let index = value.messages.firstIndex(where: { $0.id == next.turn.messageID }) else { return }
+                value.messages[index].status = .interrupted
+                value.messages[index].interruption = reason
+            }
         }
     }
 

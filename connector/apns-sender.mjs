@@ -80,8 +80,11 @@ export function createPushGateway({databasePath,token,send}) {
         validateActivityToken(p.live_activity_start_token);
         const until=p.calls_valid_until==null?null:Date.parse(p.calls_valid_until);
         requireValue(until===null || (typeof p.calls_valid_until==='string' && Number.isFinite(until)),'invalid_call_expiry');
-        db.prepare('insert into devices(binding_id,owner_id,device_id,device_token,environment,calls_valid_until) values(?,?,?,?,?,?) on conflict(owner_id,device_id) do update set device_token=excluded.device_token,environment=excluded.environment,calls_valid_until=excluded.calls_valid_until,enabled=1')
-          .run(randomUUID(),p.owner_id,p.device_id,p.device_token,p.environment,until);
+        const previous=db.prepare('select * from devices where owner_id=? and device_id=?').get(p.owner_id,p.device_id);
+        const binding=previous?.enabled && previous.device_token===p.device_token && previous.environment===p.environment ? previous.binding_id : randomUUID();
+        db.prepare('insert into devices(binding_id,owner_id,device_id,device_token,environment,calls_valid_until) values(?,?,?,?,?,?) on conflict(owner_id,device_id) do update set binding_id=excluded.binding_id,device_token=excluded.device_token,environment=excluded.environment,calls_valid_until=excluded.calls_valid_until,enabled=1')
+          .run(binding,p.owner_id,p.device_id,p.device_token,p.environment,until);
+        if(previous && previous.binding_id!==binding)activities.remove(previous.binding_id);
         const device=db.prepare('select binding_id from devices where owner_id=? and device_id=?').get(p.owner_id,p.device_id);
         activities.register(device.binding_id,p.live_activity_start_token);
         return response({binding_id:device.binding_id,live_activity_push:true,call_access_expiry:true});

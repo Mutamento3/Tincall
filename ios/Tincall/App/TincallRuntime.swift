@@ -180,6 +180,16 @@ final class TincallRuntime {
         incoming.monitorForeground(connections: connections, active: isAppActive && access.canCall)
     }
 
+    func refreshDataSharingConsent() {
+        incoming.dismissError()
+        incoming.monitorForeground(connections: [], active: false)
+        updateForegroundIncoming()
+        if incoming.isEnabled, let configuration {
+            Task { await incoming.restore(with: configuration.connections) }
+        }
+        requestAutomaticSync()
+    }
+
     private var cloudSyncConnection: ConnectionProfile? {
         configuration?.connections.first { $0.id == cloudSync?.selectedConnectionID && $0.provider == .genericConnector }
     }

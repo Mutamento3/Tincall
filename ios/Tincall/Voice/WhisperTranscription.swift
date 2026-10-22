@@ -109,13 +109,15 @@ struct WhisperInputBuffer {
     private var recognizedText: [String] = []
     private var recognizedAudio = Data()
 
+    private var bufferedBytes: Int { recognizedAudio.count + uploading.count + utterance.audio.count + pending.reduce(0) { $0 + $1.count } }
+    var isFull: Bool { bufferedBytes >= WhisperUtteranceBuffer.utteranceLimitBytes }
     var currentAudio: Data { recognizedAudio + uploading + pending.reduce(Data(), +) + utterance.audio }
 
     mutating func append(_ pcm: Data, hasSpeech: Bool) throws {
         if let completed = try utterance.append(pcm, hasSpeech: hasSpeech) { pending.append(completed) }
-        guard recognizedAudio.count + uploading.count + utterance.audio.count + pending.reduce(0, { $0 + $1.count }) <= 16_000 * 2 * 120 else {
-            throw TincallError(message: String(localized: "Whisper 转写跟不上收音，请等待或重新打开麦克风"))
-        }
+        // The recognizer pauses capture at this boundary and drains every upload.
+        // Do not discard a valid long utterance through the error/reset path.
+        if isFull { finishRecording() }
     }
 
     mutating func next() -> Data? {

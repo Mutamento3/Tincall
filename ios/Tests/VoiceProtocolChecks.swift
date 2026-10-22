@@ -11,6 +11,11 @@ struct VoiceProtocolChecks {
             print("PASS: speech segmentation, expression scope and transcript display")
             return
         }
+        if CommandLine.arguments.contains("--whisper-only") {
+            try checkWhisper()
+            print("PASS: Whisper request, utterance and bounded input preservation")
+            return
+        }
         try checkWhisper()
         try checkFish()
         try checkTutorialSegments()
@@ -68,22 +73,50 @@ struct VoiceProtocolChecks {
         let packet = Data(repeating: 0, count: 1024)
         check(try utterance.append(packet, hasSpeech: false) == nil && utterance.audio.isEmpty)
         check(try utterance.append(packet, hasSpeech: true) == nil)
-        for _ in 0..<40 { check(try utterance.append(packet, hasSpeech: false) == nil) }
+        for _ in 0..<62 { check(try utterance.append(packet, hasSpeech: false) == nil) }
         let completed = try utterance.append(packet, hasSpeech: false)
-        precondition(completed?.count == 42 * packet.count && utterance.audio.isEmpty)
+        precondition(completed?.count == 64 * packet.count && utterance.audio.isEmpty)
         check(try utterance.append(packet, hasSpeech: true) == nil && utterance.audio == packet)
         utterance = WhisperUtteranceBuffer()
-        for _ in 0..<54 { check(try utterance.append(Data(repeating: 1, count: 32_000), hasSpeech: true) == nil) }
-        check(try utterance.append(Data(repeating: 1, count: 32_000), hasSpeech: true)?.count == 1_760_000)
+        for _ in 0..<599 { check(try utterance.append(Data(repeating: 1, count: 32_000), hasSpeech: true) == nil) }
+        check(try utterance.append(Data(repeating: 1, count: 32_000), hasSpeech: true)?.count == 19_200_000)
+
+        var continuous = WhisperInputBuffer()
+        for _ in 0..<18750 { try continuous.append(packet, hasSpeech: true) }
+        precondition(continuous.isFull)
+        let longAudio = continuous.next()!
+        precondition(longAudio.count == 19_200_000)
+        let longResult = continuous.complete(text: "Long synthetic input")!
+        precondition(longResult.pcm == longAudio && continuous.currentAudio.isEmpty && !continuous.isFull)
+
+        // The same capacity applies across recognized, uploading and unfinished audio.
+        for finishesEarly in [false, true] {
+            var backlog = WhisperInputBuffer()
+            let second = Data(repeating: 1, count: 32_000)
+            try backlog.append(second, hasSpeech: true)
+            for _ in 0..<2 { try backlog.append(second, hasSpeech: false) }
+            let first = backlog.next()!
+            try backlog.append(second, hasSpeech: true)
+            if finishesEarly { precondition(backlog.complete(text: "First") == nil) }
+            for _ in 0..<596 { try backlog.append(second, hasSpeech: true) }
+            precondition(backlog.isFull && backlog.currentAudio.count == 19_200_000)
+            if !finishesEarly {
+                precondition(backlog.next() == nil)
+                precondition(backlog.complete(text: "First") == nil)
+            }
+            let rest = backlog.next()!
+            let result = backlog.complete(text: "Rest")!
+            precondition(result.text == "First\nRest" && result.pcm == first + rest && !backlog.isFull)
+        }
 
         var queued = WhisperInputBuffer()
         try queued.append(packet, hasSpeech: true)
-        for _ in 0..<41 { try queued.append(packet, hasSpeech: false) }
+        for _ in 0..<63 { try queued.append(packet, hasSpeech: false) }
         let first = queued.next()!
         precondition(queued.next() == nil)
         try queued.append(Data(repeating: 1, count: 1024), hasSpeech: true)
         precondition(queued.complete(text: "重复内容") == nil, "next utterance must survive an earlier HTTP completion")
-        for _ in 0..<41 { try queued.append(packet, hasSpeech: false) }
+        for _ in 0..<63 { try queued.append(packet, hasSpeech: false) }
         let second = queued.next()!
         let final = queued.complete(text: "重复内容")!
         precondition(final.text == "重复内容\n重复内容" && final.pcm == first + second)

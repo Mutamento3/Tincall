@@ -133,6 +133,10 @@ private final class OpeningProtocol: URLProtocol, @unchecked Sendable {
 @MainActor private final class OpeningVoice: VoiceService {
     var onEvent: ((VoiceEvent) -> Void)?
     var beginCount = 0
+    var failBegin = false
+    var failAppendFor: UUID?
+    var failFinishFor: UUID?
+    var switches = 0
     var finished = false
     var appended = ""
     var prefetchedFinished = false
@@ -148,12 +152,22 @@ private final class OpeningProtocol: URLProtocol, @unchecked Sendable {
     }
     func setMicrophoneMuted(_ muted: Bool) async throws { }
     func setSpeakerEnabled(_ enabled: Bool) async throws { }
-    func setSpeechRecognitionConnection(_ connection: ConnectionProfile) async throws { }
+    func setSpeechRecognitionConnection(_ connection: ConnectionProfile) async throws { switches += 1 }
     func setTextInputActive(_ active: Bool) { }
     func setSpeechInterruptionEnabled(_ enabled: Bool) { }
-    func beginReply(_ turn: VoiceTurnID) throws { beginCount += 1 }
-    func appendReply(_ delta: String, to turn: VoiceTurnID) throws { appended += delta }
+    func beginReply(_ turn: VoiceTurnID) throws { beginCount += 1; if failBegin { throw TincallError(message: "Synthetic synthesis failure") } }
+    func appendReply(_ delta: String, to turn: VoiceTurnID) throws {
+        if turn.messageID == failAppendFor {
+            onEvent?(.playback(turn, .failed))
+            throw TincallError(message: "Synthetic append failure")
+        }
+        appended += delta
+    }
     func finishReply(_ turn: VoiceTurnID) throws {
+        if turn.messageID == failFinishFor {
+            onEvent?(.playback(turn, .failed))
+            throw TincallError(message: "Synthetic finish failure")
+        }
         if !active, prepared == turn { prefetchedFinished = true }
         else { finished = true }
     }
@@ -175,6 +189,12 @@ private final class OpeningProtocol: URLProtocol, @unchecked Sendable {
         defer { for value in [connector,tts] { try? credentials.delete(connectionID:value.id) } }
         var role = CallRole(name:"Synthetic", sttConnectionID:stt.id, ttsConnectionID:tts.id)
         role.callMode = .mcp; role.externalConnectionID = connector.id; role.externalRoleID = "synthetic"
+        for connection in [connector, tts] { DataSharingConsent.setAllowed(true, for: connection) }
+        defer {
+            for connection in [connector, tts] {
+                UserDefaults.standard.removeObject(forKey: "tincall.dataSharing.v1.\(connection.id.uuidString)")
+            }
+        }
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [OpeningProtocol.self]
         let voice = OpeningVoice()
@@ -182,6 +202,121 @@ private final class OpeningProtocol: URLProtocol, @unchecked Sendable {
         call.onSaveRecord = { _ in }
         let f = OpeningProtocol.fixture
         let callID = f.lock.withLock { f.call }
+        if CommandLine.arguments.contains("--mcp-reentrant-failure-only") {
+            for step in ["append", "finish"] {
+                let testVoice = OpeningVoice()
+                let testCall = CallCoordinator(voice: testVoice)
+                testCall.onSaveRecord = { _ in }
+                let id = UUID()
+                let session = VoiceSessionID(callID: id, epoch: UUID())
+                testCall.session = session; testCall.phase = .active
+                var record = CallRecord(id: id, roleID: UUID(), roleName: "Synthetic", callMode: .mcp)
+                record.messages = (0..<4).map { CallMessage(turnID: UUID(), role: .assistant, text: "Reply \($0)", status: .completed) }
+                testCall.records[id] = record; testCall.record = record
+                let turns = record.messages.map { VoiceTurnID(session: session, turnID: $0.turnID, messageID: $0.id) }
+                testCall.turns[id] = turns[0]; testCall.generation = .completed; testCall.playback = .playing
+                for index in 1..<4 { testCall.externalReplyQueue.append((turns[index], turns[index].messageID, nil)) }
+                if step == "append" { testVoice.failAppendFor = turns[1].messageID }
+                else { testVoice.failFinishFor = turns[1].messageID }
+                testVoice.onEvent?(.playback(turns[0], .drained))
+                precondition(testCall.turns[id] == turns[2] && testVoice.beginCount == 2 && testCall.externalReplyQueue.count == 1,
+                             "a synchronous failure callback must not let an old catch replace the next playing reply")
+                precondition(testCall.playback == .synthesizing)
+                testVoice.onEvent?(.playback(turns[2], .drained))
+                precondition(testCall.turns[id] == turns[3] && testVoice.beginCount == 3 && testCall.externalReplyQueue.isEmpty)
+                testCall.hangUp(remotely: true)
+            }
+            print("PASS: synchronous append/finish failures cannot replace the next reply before it drains")
+            return
+        }
+        if CommandLine.arguments.contains("--stt-switch-only") {
+            f.lock.withLock { f.available = 0 }
+            try await call.prepareIncoming(callID: callID, role: role, connector: connector, connections: [connector, stt, tts], retention: AudioRetention())
+            try await call.confirmIncoming(callID: callID)
+            try await call.activatePreparedIncoming(callID: callID)
+            let identity = call.session!
+            let next = ConnectionProfile(name: "Synthetic Whisper", provider: .whisperCompatible)
+            voice.onEvent?(.speechActivity(identity, true))
+            voice.onEvent?(.speechActivity(identity, false))
+            call.requestSpeechRecognitionConnection(next)
+            try await Task.sleep(for: .milliseconds(50))
+            precondition(voice.switches == 0 && call.isAwaitingSpeechTranscript,
+                         "STT must wait for the final result even when Whisper has no partial")
+            voice.onEvent?(.transcript(identity, TranscriptResult(inputID: UUID(), text: "Synthetic final", isFinal: true)))
+            try await until { voice.switches == 1 }
+            precondition(call.record!.messages.contains { $0.role == .user && $0.text == "Synthetic final" })
+            // A new onset between the switch request and its Task must also defer it.
+            call.requestSpeechRecognitionConnection(stt)
+            voice.onEvent?(.speechActivity(identity, true))
+            voice.onEvent?(.speechActivity(identity, false))
+            try await Task.sleep(for: .milliseconds(50))
+            precondition(voice.switches == 1 && call.pendingSpeechRecognitionConnection?.id == stt.id)
+            voice.onEvent?(.transcript(identity, TranscriptResult(inputID: UUID(), text: "", isFinal: false)))
+            try await until { voice.switches == 2 }
+            call.hangUp(remotely: true)
+            print("PASS: STT switching waits for pending final transcription, rechecks new onsets and resumes after final/reset")
+            return
+        }
+        if CommandLine.arguments.contains("--mcp-queue-only") {
+            for finish in ["drained", "interrupt", "hangup", "failed", "synthesis-failed"] {
+                let testVoice = OpeningVoice()
+                let testCall = CallCoordinator(voice: testVoice, external: ExternalCallClient(credentials: credentials, configuration: configuration))
+                testCall.onSaveRecord = { _ in }
+                let id = UUID()
+                f.lock.withLock { f.call = id; f.available = 0; f.ended = false; f.epoch = 0 }
+                try await testCall.prepareIncoming(callID: id, role: role, connector: connector, connections: [connector, stt, tts], retention: AudioRetention())
+                try await testCall.confirmIncoming(callID: id)
+                try await testCall.activatePreparedIncoming(callID: id)
+                testCall.externalEventsTask?.cancel(); testCall.externalEventsTask = nil
+                let identity = testCall.session!
+                func page(_ sequence: Int, _ events: [[String: Any]], more: Bool = false) throws {
+                    let body: [String: Any] = ["call": ["id": id.uuidString, "contact_id": "synthetic", "source": "mcp", "status": "active", "epoch": 0, "last_sequence": sequence],
+                        "events": events, "cursor": sequence, "has_more": more]
+                    try testCall.receiveExternalPage(JSONDecoder().decode(ExternalEventPage.self, from: JSONSerialization.data(withJSONObject: body)), session: identity)
+                }
+                func event(_ sequence: Int, _ type: String, _ payload: [String: Any]) -> [String: Any] {
+                    ["sequence": sequence, "call_id": id.uuidString, "epoch": 0, "type": type, "payload": payload]
+                }
+                let replies = [UUID(), UUID(), UUID()]
+                var events: [[String: Any]] = []
+                for (index, reply) in replies.enumerated() {
+                    let base: [String: Any] = ["reply_id": reply.uuidString, "input_id": NSNull(), "submitted": true]
+                    events += [event(index * 2 + 1, "reply.started", base),
+                               event(index * 2 + 2, "reply.completed", base.merging(["text": "Reply \(index). "]) { _, new in new })]
+                }
+                try page(4, Array(events.prefix(4)), more: true)
+                precondition(testVoice.beginCount == 1 && testVoice.appended == "Reply 0. ", "next submitted reply must wait for current audio to drain")
+                try page(6, Array(events.suffix(2)))
+                try page(6, events) // duplicate page cannot enqueue another playback
+                precondition(testCall.record?.messages.count == 3 && testVoice.beginCount == 1)
+                let first = testCall.turns[id]!
+                if finish == "interrupt" || finish == "hangup" {
+                    testVoice.onEvent?(.playback(first, .playing))
+                    if finish == "interrupt" { testCall.interrupt() } else { testCall.hangUp() }
+                    testVoice.onEvent?(.playback(first, .drained))
+                    precondition(testVoice.beginCount == 1)
+                    precondition(testCall.record!.messages.allSatisfy { $0.status == .interrupted && $0.interruption != nil })
+                    if testCall.isCallActive { testCall.hangUp(remotely: true) }
+                } else {
+                    try page(7, [event(7, "call.ended", ["reason": "mcp_hangup"])])
+                    precondition(testCall.isCallActive)
+                    if finish == "synthesis-failed" { testVoice.failBegin = true }
+                    testVoice.onEvent?(.playback(first, finish == "failed" ? .failed : .drained))
+                    if finish == "drained" {
+                        precondition(testCall.isCallActive && testVoice.beginCount == 2)
+                        testVoice.onEvent?(.playback(first, .drained)) // stale callback
+                        precondition(testVoice.beginCount == 2)
+                        testVoice.onEvent?(.playback(testCall.turns[id]!, .drained))
+                        precondition(testCall.isCallActive && testVoice.beginCount == 3)
+                        testVoice.onEvent?(.playback(testCall.turns[id]!, .drained))
+                        precondition(testVoice.appended == "Reply 0. Reply 1. Reply 2. ")
+                    }
+                    precondition(!testCall.isCallActive, "MCP hangup must finish on drain or playback failure")
+                }
+            }
+            print("PASS: consecutive MCP replies drain in order, survive pagination, deduplicate and terminate on interrupt/hangup/failure")
+            return
+        }
         if CommandLine.arguments.contains("--missed-call") {
             var saved: [CallRecord] = []
             call.onSaveRecord = { saved.append($0) }
@@ -224,6 +359,7 @@ private final class OpeningProtocol: URLProtocol, @unchecked Sendable {
             f.lock.withLock { f.available = 3 }
             try await until { voice.finished }
             let first = call.turns[callID]!
+            voice.onEvent?(.playback(first, .playing))
             call.interrupt()
             try await until { call.record?.externalPendingControl == nil }
             precondition(voice.interrupted == first)

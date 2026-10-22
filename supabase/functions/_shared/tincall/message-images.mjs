@@ -1,4 +1,5 @@
 import {ConnectorError, ensure, uuid, object, imageBytes, base64, MAX_IMAGE} from './protocol.mjs';
+import {callReference} from './mcp.mjs';
 
 export function createMessageImages(store) {
   async function linkedCallRecord(owner, id, signal) {
@@ -119,11 +120,11 @@ function mcpText(value) {
   if (value.call?.status === 'ended' && value.call.summary) parts.push(`通话摘要：\n${value.call.summary}`);
   if (value.voice_instructions) parts.push(`本次通话的朗读要求：\n${value.voice_instructions}`);
   if (value.calls) parts.push(value.calls.length ? value.calls.map(call =>
-    `${call.started_at} · ${{active:'进行中',ringing:'呼叫中',ended:'已结束'}[call.status] ?? call.status}${call.has_summary ? ' · 有摘要' : ''}\ncall_id: ${call.call_id}`).join('\n\n') : '暂无通话记录。');
+    `${call.started_at} · ${{active:'进行中',ringing:'呼叫中',ended:'已结束'}[call.status] ?? call.status}${call.has_summary ? ' · 有摘要' : ''}\ncall_id: ${callReference(call.call_id)}`).join('\n\n') : '暂无通话记录。');
   if (value.wait_error) parts.push(`回复已保存，等待下一条消息失败（${value.wait_error.code}）。请调用 tincall_wait 继续等待，无需重发回复。`);
   if (value.has_more) {
-    if (value.next_before_sequence != null) parts.push(`还有更早的消息：tincall_get_call ${JSON.stringify({call_id:value.call.id,before_sequence:value.next_before_sequence})}`);
-    else if (value.next_cursor) parts.push(`还有通话记录：tincall_list_calls ${JSON.stringify({before:value.next_cursor})}`);
+    if (value.next_before_sequence != null) parts.push(`还有更早的消息：tincall_get_call ${JSON.stringify({call_id:callReference(value.call.id),before_sequence:value.next_before_sequence})}`);
+    else if (value.next_cursor) parts.push(`还有通话记录：tincall_list_calls ${JSON.stringify({before:{...value.next_cursor,call_id:callReference(value.next_cursor.call_id)}})}`);
 
   }
   if (value.next_action?.tool && value.event !== 'timeout') parts.push('请调用 tincall_wait 继续等待。');

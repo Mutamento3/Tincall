@@ -850,6 +850,8 @@ final class IncomingCallController: NSObject, @preconcurrency PKPushRegistryDele
         return update
     }
 
+    func dismissError() { errorMessage = nil }
+
     private func report(_ error: Error) { errorMessage = safeMessage(error) }
 
     private func safeMessage(_ error: Error) -> String {

@@ -38,3 +38,45 @@ test('push jobs continue after one device fails and remove only confirmed obsole
     await mutate('call.end',{call_id:retry,epoch:0,reason:'ended'});
   }
 });
+
+test('old APNs failure cannot remove a token refreshed during delivery', async t => {
+  const {createPushGateway, PushError} = await import('../apns-sender.mjs');
+  const {createConnector} = await import('../../supabase/functions/_shared/tincall/service.mjs');
+  const directory = mkdtempSync(join(tmpdir(), 'tincall-token-race-'));
+  const owner = crypto.randomUUID(), device = crypto.randomUUID(), call = crypto.randomUUID();
+  let started, rejectOld;
+  const sending = new Promise(resolve => { started = resolve; });
+  const config = {clients: [{token: 'synthetic-phone', owner_id: owner}], pushURL: 'https://synthetic.invalid', pushToken: 'synthetic-push-token-at-least-24-characters'};
+  const gateway = createPushGateway({databasePath: join(directory, 'push.sqlite'), token: config.pushToken,
+    send: async value => {
+      if (value.device_token === 'a'.repeat(64)) { started(); await new Promise((_, reject) => { rejectOld = reject; }); }
+    }});
+  const store = createSQLiteStore(config, join(directory, 'calls.sqlite'));
+  t.after(() => { store.close(); gateway.close(); rmSync(directory, {recursive: true, force: true}); });
+  const fetcher = (url, init) => gateway.handle(new Request(url, init));
+  const connector = createConnector({store, config, fetcher});
+  async function register(value) {
+    const response = await connector.handle(new Request('https://connector.invalid/devices', {method: 'POST',
+      headers: {Authorization: 'Bearer synthetic-phone', 'Content-Type': 'application/json'},
+      body: JSON.stringify({request_id: crypto.randomUUID(), device_id: device, device_token: value.repeat(64), environment: 'sandbox'})}));
+    assert.equal(response.status, 200); return response.json();
+  }
+  const original = await register('a');
+  assert.equal((await register('a')).binding_id, original.binding_id, 'unchanged healthy binding stays stable');
+  await store.command(owner, 'call.incoming', {request_id: crypto.randomUUID(), call_id: call, contact_id: 'synthetic', source: 'mcp'});
+  const jobs = createCallJobs({store, config, fetcher});
+  const running = jobs.runOwner(owner);
+  await sending;
+  const refreshed = await register('b');
+  rejectOld(new PushError('apns_device_expired', 502));
+  await running;
+  await store.command(owner, 'call.end', {request_id: crypto.randomUUID(), call_id: call, epoch: 0});
+  await store.command(owner, 'call.incoming', {request_id: crypto.randomUUID(), call_id: crypto.randomUUID(), contact_id: 'synthetic', source: 'mcp'});
+  const next = await store.command(owner, 'push.claim', {});
+  assert.equal(next.push.devices.length, 1, 'late failure must retain refreshed connector routing');
+  assert.notEqual(refreshed.binding_id, original.binding_id);
+  const direct = await gateway.handle(new Request('https://synthetic.invalid/push', {method: 'POST',
+    headers: {Authorization: `Bearer ${config.pushToken}`, 'Content-Type': 'application/json'},
+    body: JSON.stringify({owner_id: owner, binding_id: refreshed.binding_id, call_id: crypto.randomUUID(), contact_id: 'synthetic', source: 'mcp', event: 'incoming_call'})}));
+  assert.equal(direct.status, 200, 'late failure must leave the new token enabled in the gateway');
+});

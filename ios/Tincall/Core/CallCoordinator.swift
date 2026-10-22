@@ -52,6 +52,7 @@ final class CallCoordinator {
     @ObservationIgnored var turns: [UUID: VoiceTurnID] = [:]
     @ObservationIgnored var modelEndTurn: VoiceTurnID?
     @ObservationIgnored var externalEndSession: VoiceSessionID?
+    @ObservationIgnored var externalReplyQueue: [(turn: VoiceTurnID, replyID: UUID, inputID: UUID?)] = []
     @ObservationIgnored var tasks: [UUID: Task<Void, Never>] = [:]
     @ObservationIgnored let summaryTasks: CallSummaryTasks
     @ObservationIgnored var pendingAudio: [UUID: [VoiceAudioSegment]] = [:]
@@ -109,7 +110,7 @@ final class CallCoordinator {
     }
     var canSend: Bool { phase == .active && session != nil && externalEndSession == nil }
     private var canBeginTurn: Bool {
-        canSend && generation != .generating && playback != .playing && playback != .synthesizing &&
+        canSend && externalReplyQueue.isEmpty && generation != .generating && playback != .playing && playback != .synthesizing &&
         record?.externalPendingInput == nil && record?.externalPendingControl == nil
     }
     var canInterrupt: Bool { generation == .generating || (isCallActive && (playback == .playing || playback == .synthesizing)) }
@@ -379,7 +380,7 @@ final class CallCoordinator {
     private func applyPendingSpeechRecognitionConnection() {
         guard phase == .active, let identity = session, !textOnly,
               !isSwitchingSpeechRecognition, muteTransitionID == nil,
-              !isUserSpeaking, partialTranscript.isEmpty, partialInput == nil,
+              !isUserSpeaking, !isAwaitingSpeechTranscript, partialTranscript.isEmpty, partialInput == nil,
               let connection = pendingSpeechRecognitionConnection else { return }
         let audioMode = pendingOriginalAudioInputEnabled
         isSwitchingSpeechRecognition = true
@@ -393,7 +394,7 @@ final class CallCoordinator {
                     self.speechRecognitionTask = nil
                 }
             }
-            guard !self.isUserSpeaking, self.partialTranscript.isEmpty, self.partialInput == nil else { return }
+            guard !self.isUserSpeaking, !self.isAwaitingSpeechTranscript, self.partialTranscript.isEmpty, self.partialInput == nil else { return }
             do {
                 try await self.voice.setSpeechRecognitionConnection(connection)
                 guard self.session == identity, !Task.isCancelled else { return }
@@ -517,6 +518,7 @@ final class CallCoordinator {
     func cancelReply(_ turn: VoiceTurnID, reason: MessageInterruption) {
         let id = turn.session.callID
         if modelEndTurn == turn { modelEndTurn = nil }
+        discardQueuedExternalReplies(reason: reason)
         // A completed reply can still be in the TTS synthesis queue. Stopping
         // that queue before its first playback callback is not an interrupted
         // audible reply, so keep the completed message clean.
@@ -548,6 +550,7 @@ final class CallCoordinator {
         modelEndTurn = nil
         stopActivityCheckpoints(session)
         RequestLogStore.shared.markHangUp(callID: session.callID)
+        discardQueuedExternalReplies(reason: .hangUp)
         if canInterrupt, let turn = turns[session.callID] {
             cancelReply(turn, reason: .hangUp)
         } else {
@@ -832,6 +835,7 @@ final class CallCoordinator {
             playback = state
             if state == .failed, modelEndTurn == turn { modelEndTurn = nil }
             if state == .playing { floatingUserTranscript = "" }
+            if (state == .drained || (state == .failed && externalEndSession == nil)), beginQueuedExternalReply() { return }
             if (state == .drained || state == .failed), externalEndSession == turn.session {
                 if state == .failed { errorMessage = String(localized: "播放失败") }
                 endFromExternal(turn.session)

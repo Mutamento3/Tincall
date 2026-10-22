@@ -50,6 +50,11 @@ enum DataSharingConsent {
         connection.provider == .appleSpeech || (canAuthorize(connection) && defaults.stringArray(forKey: key(connection)) == destination(connection) && !defaults.bool(forKey: key(connection) + ".revoked"))
     }
 
+    static func needsReview(_ connection: ConnectionProfile, defaults: UserDefaults = .standard) -> Bool {
+        connection.provider != .appleSpeech && defaults.object(forKey: key(connection)) == nil
+            && defaults.object(forKey: key(connection) + ".revoked") == nil
+    }
+
     static func isCleanupAllowed(_ connection: ConnectionProfile, defaults: UserDefaults = .standard) -> Bool {
         canAuthorize(connection) && [key(connection), key(connection) + ".deviceBinding"].contains { defaults.stringArray(forKey: $0) == destination(connection) }
     }

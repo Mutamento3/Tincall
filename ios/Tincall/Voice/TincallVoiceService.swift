@@ -40,6 +40,7 @@ final class TincallVoiceService: VoiceService {
     private var preparingIncomingAudio = false
     private var interruptionAvailability: SpeechInterruptionAvailability?
     private var backgroundEngine: AVAudioEngine?
+    private var backgroundObservationID = UUID()
     private var backgroundPlayer: AVAudioPlayerNode?
     private var backgroundBuffer: AVAudioPCMBuffer?
     private var backgroundConfigurationObserver: NSObjectProtocol?
@@ -806,9 +807,11 @@ final class TincallVoiceService: VoiceService {
         player.play()
         backgroundEngine = engine; backgroundPlayer = player; backgroundBuffer = silence
         let expectedSession = session
-        backgroundConfigurationObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self, weak engine] _ in
-            Task { @MainActor [weak self, weak engine] in
-                guard let self, let engine, let expectedSession, self.backgroundEngine === engine,
+        let observationID = UUID()
+        backgroundObservationID = observationID
+        backgroundConfigurationObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, self.backgroundObservationID == observationID, let engine = self.backgroundEngine, let expectedSession,
                       self.session == expectedSession, !self.audioInterrupted, !engine.isRunning else { return }
                 guard self.outputChangesInFlight == 0 else { return }
                 do { try await self.startIndependentAudio() }

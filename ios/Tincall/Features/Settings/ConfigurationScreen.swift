@@ -111,10 +111,7 @@ struct ConfigurationScreen: View {
                     ShortcutSettingsScreen()
                 }
                 VStack(spacing: 0) {
-                    Link(destination: DataSharingConsent.privacyURL) {
-                    SettingsActionLabel(title: String(localized: "隐私政策"), symbol: "hand.raised", detail: String(localized: "数据处理与第三方服务"))
-                }
-                scrollingSectionHeader(.appAndData)
+                    scrollingSectionHeader(.appAndData)
                     if CallAccessStore.isStoreBuild {
                         settingsLink(String(localized: "试用与解锁"), detail: String(localized: "7 天免费试用 · 一次性买断 · 恢复购买")) {
                             CallAccessScreen()

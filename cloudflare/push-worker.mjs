@@ -85,10 +85,14 @@ export class PushRegistry {
         requireValue(this.env.APNS_TEAM_ID && this.env.APNS_TOPIC?.endsWith('.voip') &&
           (sandbox ? this.env.APNS_SANDBOX_KEY_ID && this.env.APNS_SANDBOX_KEY_P8
             : this.env.APNS_PRODUCTION_KEY_ID && this.env.APNS_PRODUCTION_KEY_P8), 'apns_configuration_missing', 503);
+        const previous = this.sql.exec('SELECT * FROM devices WHERE device_id=?', p.device_id.toLowerCase()).toArray()[0];
+        const binding = previous?.enabled && previous.device_token === p.device_token && previous.environment === p.environment
+          ? previous.binding_id : crypto.randomUUID();
         const result = this.sql.exec(`INSERT INTO devices(device_id, binding_id, device_token, environment, calls_valid_until)
           VALUES(?, ?, ?, ?, ?) ON CONFLICT(device_id) DO UPDATE SET
-          device_token=excluded.device_token, environment=excluded.environment, calls_valid_until=excluded.calls_valid_until, enabled=1 RETURNING binding_id`,
-          p.device_id.toLowerCase(), crypto.randomUUID(), p.device_token, p.environment, until).toArray()[0];
+          binding_id=excluded.binding_id, device_token=excluded.device_token, environment=excluded.environment, calls_valid_until=excluded.calls_valid_until, enabled=1 RETURNING binding_id`,
+          p.device_id.toLowerCase(), binding, p.device_token, p.environment, until).toArray()[0];
+        if (previous && previous.binding_id !== binding) this.activities.remove(previous.binding_id);
         this.activities.register(result.binding_id, p.live_activity_start_token);
         return json({ ...result, live_activity_push: true, call_access_expiry: true });
       }

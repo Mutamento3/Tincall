@@ -22,8 +22,10 @@ private final class ConsentRequestProtocol: URLProtocol, @unchecked Sendable {
         defer { defaults.removePersistentDomain(forName: suite) }
         let original = ConnectionProfile(name: "Synthetic", provider: .openAICompatible, endpoint: URL(string: "https://fixture.invalid/v1"))
         precondition(!DataSharingConsent.isAllowed(original, defaults: defaults))
+        precondition(DataSharingConsent.needsReview(original, defaults: defaults))
         DataSharingConsent.setAllowed(true, for: original, defaults: defaults)
         precondition(DataSharingConsent.isAllowed(original, defaults: UserDefaults(suiteName: suite)!))
+        precondition(!DataSharingConsent.needsReview(original, defaults: defaults))
         var changed = original
         changed.endpoint = URL(string: "https://different-fixture.invalid/v1")
         precondition(!DataSharingConsent.isAllowed(changed, defaults: defaults))
@@ -40,8 +42,10 @@ private final class ConsentRequestProtocol: URLProtocol, @unchecked Sendable {
         precondition(!String(describing: defaults.dictionaryRepresentation()).contains("synthetic-secret"))
         DataSharingConsent.setAllowed(false, for: original, defaults: defaults)
         precondition(!DataSharingConsent.isAllowed(original, defaults: defaults))
+        precondition(!DataSharingConsent.needsReview(original, defaults: defaults), "Do not repeatedly prompt for an explicit refusal")
         let onDevice = ConnectionProfile(name: "Apple", provider: .appleSpeech)
         precondition(DataSharingConsent.isAllowed(onDevice, defaults: defaults))
+        precondition(!DataSharingConsent.needsReview(onDevice, defaults: defaults))
         let voice = ConnectionProfile(name: "Synthetic voice", provider: .elevenLabs)
         let connector = ConnectionProfile(name: "Synthetic incoming", provider: .genericConnector, endpoint: URL(string: "https://incoming.fixture.invalid"))
         var role = CallRole(name: "Synthetic incoming")

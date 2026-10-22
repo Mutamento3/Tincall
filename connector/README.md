@@ -417,7 +417,7 @@ phone has not answered or the person has not spoken, and directs the AI to
 
 For a contact-scoped credential, dialing needs no arguments. Ordinary MCP replies
 use `{"call":"XXXXXXXX","text":"完整回复"}`, copying the 8-character marker
-returned with that task's input. Use the same marker for end and subsequent waits;
+returned when that call was opened or discovered. Use the same marker for end and subsequent waits;
 omit it from wait only to discover a new call. Never replace an old task's marker
 with a newer call. The service resolves it within the authenticated owner/contact,
 rejects unknown or ambiguous references, and refuses mutations on ended calls.
@@ -429,7 +429,11 @@ A repeated dial reuses the unfinished call.
 Ordinary tool results contain readable text and actual images, without duplicate
 `structuredContent`. User messages use the profile name sent by the phone, for
 example `小白：` followed by the message. They do not add receipt announcements
-or per-turn routing metadata; one short `call` marker identifies the call. Voice requirements are delivered once at call start,
+or per-turn routing metadata. Opening or discovering a call and explicitly looking
+one up returns its short `call` marker; replies and waits that already specify it
+do not repeat the marker after each message. History lists and pagination links
+also use eight-character IDs: pass one as `call_id` to `tincall_get_call` to read
+that call. Voice requirements are delivered once at call start,
 including when using the wake bridge. Wait reads new messages and drains pages
 internally; later waits do not repeat delivered messages. History recovery is an
 explicit `tincall_get_call` operation, with older-page links when needed.

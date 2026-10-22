@@ -16,10 +16,10 @@ const waitProperties = {
 };
 const toolDefinitions = [
   ['tincall_call', 'Call the linked phone and wait for the person to answer. When answered, speak by calling tincall_reply with your complete text. If nobody answers within two minutes, call tincall_wait to keep waiting.', {contact_id:{type:'string'},timeout_seconds:waitProperties.timeout_seconds}, ['contact_id']],
-  ['tincall_get_call', 'Read saved conversation history and current call state. An ended call may also have a summary. For live conversation use tincall_wait; after a timeout keep waiting. History is paged, newest page first.', {call_id:{type:'string'},limit:{type:'integer',minimum:1,maximum:100,default:50},before_sequence:{type:'integer',minimum:1}}, []],
+  ['tincall_get_call', 'Read saved conversation history and current call state using the 8-character call ID, or omit it to find the current call. An ended call may also have a summary. For live conversation use tincall_wait; after a timeout keep waiting. History is paged, newest page first.', {call_id:{type:'string',description:'8-character call ID from a call result or history list.'},limit:{type:'integer',minimum:1,maximum:100,default:50},before_sequence:{type:'integer',minimum:1}}, []],
   ['tincall_wait', 'Wait for the next message, phone answer or hangup. Reuse the short call marker for this task; omit call only to discover a new call. After a timeout keep waiting.', {call:{type:'string',minLength:8,maxLength:8},timeout_seconds:waitProperties.timeout_seconds}, []],
-  ['tincall_reply', 'Speak your complete reply. Copy the 8-character call marker from the input that produced this task. Never substitute a new call marker to retry an old reply. For a goodbye, set wait_for_input:false and call tincall_end with the same marker.', {call:{type:'string',minLength:8,maxLength:8},text:{type:'string'},wait_for_input:{type:'boolean',default:true},timeout_seconds:waitProperties.timeout_seconds}, ['call','text']],
-  ['tincall_end', 'Hang up after the phone finishes reading your reply. Copy the same 8-character call marker that produced this task. Never substitute another call to retry an old hangup.', {call:{type:'string',minLength:8,maxLength:8}}, ['call']],
+  ['tincall_reply', 'Speak your complete reply, then wait for the next input by default. Omit wait_for_input; set it to false only to return immediately, such as before tincall_end. Reuse the 8-character call marker returned when this call was opened or discovered. Later messages do not repeat it. Never substitute a new call marker to retry an old reply or hangup.', {call:{type:'string',minLength:8,maxLength:8},text:{type:'string'},wait_for_input:{type:'boolean',default:true,description:'Omit to wait for the next input. Set false only to return immediately.'},timeout_seconds:waitProperties.timeout_seconds}, ['call','text']],
+  ['tincall_end', 'Hang up after the phone finishes reading your reply. Reuse the 8-character call marker returned when this call was opened or discovered. Never substitute another call to retry an old hangup.', {call:{type:'string',minLength:8,maxLength:8}}, ['call']],
   ['tincall_list_calls', 'List saved calls. Use get_call to read a selected conversation and any available summary.', {limit:{type:'integer',minimum:1,maximum:50,default:10},before:{type:'object',properties:{started_at:{type:'string'},call_id:{type:'string'}},required:['started_at','call_id'],additionalProperties:false}}, []],
 ].map(([name, description, properties, required]) => ({name, description, inputSchema:{type:'object',properties,required,additionalProperties:false}}));
 
@@ -119,9 +119,9 @@ export function createMCP({store, command, ensureOpening, schedule, mcpContent})
   }
 
   // Render media before advancing delivery, so a failed image load is retryable.
-  async function renderResult(principal,value) {
+  async function renderResult(principal,value,showCallMarker) {
     const content=await mcpContent(principal,{...value,voice_instructions:null});
-    if(!principal.wake_bridge && value.call && value.call.status!=='ended' && !value.error) {
+    if(!principal.wake_bridge && value.call && showCallMarker && !value.error) {
       content.push({type:'text',text:`call: ${callReference(value.call.id)}`});
     }
     if(value.voice_instructions && value.call?.status==='active') {
@@ -217,6 +217,7 @@ export function createMCP({store, command, ensureOpening, schedule, mcpContent})
             }
             break;
           case 'tincall_get_call': {
+            if(typeof args.call_id==='string' && args.call_id.length===8)args.call_id=await boundCallID(principal,{call:args.call_id});
             if(principal.mcp_call_id)args.call_id=await boundCallID(principal,args);
             if (args.call_id !== undefined) uuid(args.call_id,'call_id');
             if (args.before_sequence !== undefined) ensure(integer(args.before_sequence,'before_sequence')>0,'invalid_before_sequence');
@@ -252,14 +253,18 @@ export function createMCP({store, command, ensureOpening, schedule, mcpContent})
           case 'tincall_list_calls': {
             const limit=args.limit === undefined ? 10 : args.limit; ensure(Number.isSafeInteger(limit) && limit>=1 && limit<=50,'invalid_limit');
             if (args.before !== undefined) {
-              const before=object(args.before); uuid(before.call_id,'cursor');
+              const before=object(args.before);
               ensure(Object.keys(before).every(key=>['call_id','started_at'].includes(key)) && typeof before.started_at==='string' && Number.isFinite(Date.parse(before.started_at)),'invalid_cursor');
+              if(typeof before.call_id==='string' && before.call_id.length===8)before.call_id=await boundCallID(principal,{call:before.call_id});
+              uuid(before.call_id,'cursor');
             }
             value=await store.mcpCommand(principal.owner_id,principal.contact_id ?? null,'list',{...args,limit}); break;
           }
         }
         if (value?.call) value={...value,call:publicCall(value.call)};
-        result={content:await renderResult(principal,value),isError:Boolean(value.error)};
+        const showCallMarker=params.name==='tincall_get_call' || (value.call?.status!=='ended' &&
+          (params.name==='tincall_call' || (params.name==='tincall_wait' && args.call===undefined)));
+        result={content:await renderResult(principal,value,showCallMarker),isError:Boolean(value.error)};
       } catch(error) {
         const code = error instanceof ConnectorError ? error.code : 'request_failed';
         if (value?.reply_accepted) {
