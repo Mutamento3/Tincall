@@ -2,20 +2,30 @@
 
 [简体中文](#简体中文) · [English](#english)
 
+### 功能概览 / Feature overview
+
+| 系统来电与通话 / Calls | 自有云端 / Your cloud | 连接 AI / Connect your AI |
+| --- | --- | --- |
+| ![系统来电与通话](docs/images/01-tincall-incoming.png) | ![部署自己的云端](docs/images/02-your-own-cloud.png) | ![三种 AI 接入方式](docs/images/03-connect-your-ai.png) |
+| 通话中分享 / Share during a call | 通话记录 / Call records | |
+| ![通话中发送截图和文字](docs/images/04-share-during-a-call.png) | ![通话记录与重听](docs/images/05-call-records.png) | |
+
 ## 简体中文
 
-Tincall 是最低支持 iOS 26 的原生 AI 语音通话 App。支持手机直连模型、MCP 和自有后端；收音、语音识别、语音合成、播放及本地记录由手机处理。
+Tincall 是最低支持 iOS 26 的原生 AI 语音通话 App。支持手机直连模型、自有后端，以及 MCP（模型上下文协议，让外部 AI 调用 Tincall 的通话工具）；收音、语音识别、语音合成、播放及本地记录由手机处理。
 
 本仓库公开源码供个人使用、修改与按许可分享。使用范围见 [许可](LICENSE)，第三方组件保留其独立许可，见 [第三方声明](docs/third_party.md)。源码公开不代表采用无限制的开源许可。
 
 ### 选择通话方式
 
+“连接端”是部署在自己的云端、电脑或服务器上的服务，负责连接手机和外部 AI、转发消息并管理通话状态。点击下表中的方式名称可查看对应配置步骤。
+
 | 方式 | AI 与上下文在哪里 | 需要准备什么 | 回复方式 |
 | --- | --- | --- | --- |
-| 独立模式 | 手机直连所选模型 API | 模型、STT、TTS 的配置；日常通话不需要云端 | 模型增量流式回复，手机分段合成播放 |
-| 普通 MCP | 外部 AI 平台 | Tincall 连接端、对应联系人的 MCP 配置、正在运行并能调用工具的 AI | AI 用 `tincall_reply({text})` 提交完整回复，默认等待下一句话 |
-| MCP＋唤醒桥 | 外部 AI 平台 | 连接端、唤醒订阅程序、平台任务启动命令及专用 MCP | 收到事件启动一轮，提交完整回复后结束；新输入再唤醒 |
-| 后端模式 | 接入方自己的后端 | 完整实现手机通话协议，或复用连接端只接生成和取消 | 支持流式增量和完整回复，由后端选择 |
+| [独立模式](#开始使用) | 手机直连所选模型 API | 模型、STT、TTS 的配置；日常通话不需要云端 | 模型增量流式回复，手机分段合成播放 |
+| [普通 MCP](docs/agent_prompt.md) | 外部 AI 平台 | Tincall 连接端、对应联系人的 MCP 配置、正在运行并能调用工具的 AI | AI 用 `tincall_reply({text})` 提交完整回复，默认等待下一句话 |
+| [MCP＋唤醒桥](connector/README.md#唤醒桥接入) | 外部 AI 平台 | 连接端、唤醒订阅程序、平台任务启动命令及专用 MCP | 收到事件启动一轮，提交完整回复后结束；新输入再唤醒 |
+| [后端模式](docs/agent_prompt.md) | 接入方自己的后端 | 完整实现手机通话协议，或复用连接端只接生成和取消 | 支持流式增量和完整回复，由后端选择 |
 
 联系人里仍是独立、MCP、后端三种模式；唤醒桥是 MCP 的一种接法。后端的模型、人物、记忆、工具及业务流程由接入方决定，不强制每通电话新建模型会话。
 
@@ -125,18 +135,20 @@ App 中打开“设置 → Tincall 云端 → 部署或更新服务”，用自�
 
 ## English
 
-Tincall is a native AI voice calling app for iOS 26 and later. It supports direct model connections, MCP, and your own backend. The iPhone handles audio capture, speech service integration, playback, and local call records.
+Tincall is a native AI voice calling app for iOS 26 and later. It supports direct model connections, your own backend, and MCP (Model Context Protocol), which lets external AI platforms call Tincall's tools. The iPhone handles audio capture, speech service integration, playback, and local call records.
 
 The source is available for personal use, modification, and source sharing under the [license](LICENSE). Source availability does not grant unrestricted open-source rights. Third-party components retain their own licenses; see [third-party notices](docs/third_party.md).
 
 ### Choose a call mode
 
+A connector is a service you deploy in your own cloud, on a computer, or on a server to connect the phone to an external AI, relay messages, and manage call state. Click a mode name below for setup steps.
+
 | Mode | Where the AI and context run | What you need | How replies arrive |
 | --- | --- | --- | --- |
-| Standalone | The iPhone connects directly to your chosen model API | Model, STT, and TTS settings; no connector is needed for everyday calls | Streaming model output, synthesized and played in segments on the phone |
-| Standard MCP | An external AI platform | A Tincall connector, the contact's MCP configuration, and a running AI that can call tools | The AI submits a complete reply with `tincall_reply({text})`, then waits for the next input by default |
-| MCP with a wake bridge | An external AI platform | A connector, an event subscriber, a platform task command, and the dedicated MCP configuration | Each event starts a task; the AI submits a complete reply and ends the task, then wakes again for new input |
-| Backend | Your own backend | Implement the phone protocol, or reuse the connector and supply generation and cancellation endpoints | Streaming deltas or complete replies, as implemented by your backend |
+| [Standalone](docs/setup.en.md#make-a-first-standalone-call) | The iPhone connects directly to your chosen model API | Model, STT, and TTS settings; no connector is needed for everyday calls | Streaming model output, synthesized and played in segments on the phone |
+| [Standard MCP](docs/setup.en.md#connect-an-external-ai) | An external AI platform | A Tincall connector, the contact's MCP configuration, and a running AI that can call tools | The AI submits a complete reply with `tincall_reply({text})`, then waits for the next input by default |
+| [MCP with a wake bridge](docs/setup.en.md#connect-an-external-ai) | An external AI platform | A connector, an event subscriber, a platform task command, and the dedicated MCP configuration | Each event starts a task; the AI submits a complete reply and ends the task, then wakes again for new input |
+| [Backend](docs/setup.en.md#connect-an-external-ai) | Your own backend | Implement the phone protocol, or reuse the connector and supply generation and cancellation endpoints | Streaming deltas or complete replies, as implemented by your backend |
 
 Contacts have three modes: standalone, MCP, and backend. A wake bridge is one way to connect MCP. Your backend determines the model, persona, memory, tools, and application logic; Tincall does not require a new model session for every call.
 
@@ -150,9 +162,9 @@ Model, speech, and self-hosting costs depend on their respective providers; purc
 
 ### Get started
 
-1. **Install the iPhone app.** Download `*-selfsign-unsigned.ipa` from the [latest release](https://github.com/chuli1122/Tincall/releases/latest) and follow the [signing guide](docs/SELF_SIGN.md) to re-sign and install it with your own signing credentials, without recompiling. You need an iPhone running iOS 26 or later, and a signing tool that correctly configures the app and extension identifiers and App Group. You can also build from source using a Mac and Xcode.
-2. **Configure recognition and speech.** Add STT and TTS settings in the app, including the provider, model, and voice. TTS expression prompts have model-specific defaults and can be edited.
-3. **Configure a contact.** In standalone mode, select a model and enter a persona. For MCP, register the contact and copy its platform configuration using the [integration guide](docs/agent_prompt.md). For backend mode, prepare your service using the [HTTP protocol documentation](docs/backend_api.md).
+1. **Install the iPhone app.** Download `*-selfsign-unsigned.ipa` from the [latest release](https://github.com/chuli1122/Tincall/releases/latest) and follow the [signing guide](docs/setup.en.md#install-a-self-signing-ipa) to re-sign and install it with your own signing credentials, without recompiling. You need an iPhone running iOS 26 or later, and a signing tool that correctly configures the app and extension identifiers and App Group. You can also [build from source](docs/setup.en.md#build-from-source) using a Mac and Xcode.
+2. **Configure recognition and speech.** Follow the [first-call setup](docs/setup.en.md#make-a-first-standalone-call) to add STT and TTS settings in the app, including the provider, model, and voice. TTS expression prompts have model-specific defaults and can be edited.
+3. **Configure a contact.** In standalone mode, select a model and enter a persona. For MCP or backend mode, follow [Connect an external AI](docs/setup.en.md#connect-an-external-ai).
 4. **Test a complete call.** Check service and model availability, then verify audio capture, replies, playback, interruption, and hang-up.
 
 Hanging up on the phone immediately stops generation and playback. Interrupting a reply keeps the call connected. When the AI hangs up through MCP, the phone waits for already received replies to finish playing; playback failure also ends the call. Received content is preserved, with interruption reasons recorded where applicable.
@@ -188,11 +200,11 @@ sh connector/install-local.sh
 powershell -NoProfile -ExecutionPolicy Bypass -File connector\install-local.ps1
 ```
 
-Docker is also supported. The connector listens on loopback by default. The phone needs a reachable HTTPS address; use a reverse proxy or follow the tunnel instructions in the [connector guide](connector/README.md#部署到自己的电脑或服务器). Enter the HTTPS base address and phone token under “Connect to an existing service” in the app. Keep the computer running. Temporary tunnel addresses may change after restarting.
+Docker is also supported. The connector listens on loopback by default. The phone needs a reachable HTTPS address; follow the [computer/server setup guide](docs/setup.en.md#node-on-your-computer-or-server) to configure access through a reverse proxy or tunnel. Enter the HTTPS base address and phone token under “Connect to an existing service” in the app. Keep the computer running. Temporary tunnel addresses may change after restarting.
 
 #### Supabase
 
-In the app, open Settings → Tincall Cloud → Deploy or update service, then deploy using your own project and a management token restricted to that project. Save the regular connection after deployment. Adding an MCP contact does not require redeployment. CLI deployment is also available; see the [deployment guide](docs/cloud_setup.md).
+In the app, open Settings → Tincall Cloud → Deploy or update service, then deploy using your own project and a management token restricted to that project. Save the regular connection after deployment. Adding an MCP contact does not require redeployment. CLI deployment is also available; see the [deployment guide](docs/setup.en.md#supabase-from-a-computer).
 
 Updating the app does not update an existing cloud service. Upgrade through the original deployment method and preserve its tokens and data. Do not replace an existing configuration with a separate first-time setup. Image migrations are included in the app's deployment flow and CLI deployment; no manual SQL step is needed. See [image messages](docs/message_images.md). The base migration creates the private storage bucket and permissions used by recordings and images. Recording retention and backup must still be enabled separately.
 
@@ -222,9 +234,9 @@ The [English setup guide](docs/setup.en.md) covers signing, a first call, connec
 | `cloudflare/` | Optional push Worker |
 | `ios/Tests/`, `connector/tests/`, `cloudflare/tests/` | Module and protocol checks |
 
-- [Signing and installation](docs/SELF_SIGN.md)
-- [Cloud deployment](docs/cloud_setup.md)
-- [MCP and backend setup](docs/agent_prompt.md)
+- [Signing and installation](docs/setup.en.md#install-a-self-signing-ipa)
+- [Cloud deployment](docs/setup.en.md#deploy-a-connector-only-if-needed)
+- [MCP and backend setup](docs/setup.en.md#connect-an-external-ai)
 - [MCP tool parameters and behavior](docs/mcp.md)
 - [Backend HTTP protocol](docs/backend_api.md)
 - [Image messages](docs/message_images.md)
