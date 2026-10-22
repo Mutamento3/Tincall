@@ -20,7 +20,7 @@ export function createSupabaseStore(config, fetcher = fetch) {
       if (name === 'tincall_wake_bridge' && ['PGRST202','42883'].includes(body.code)) throw new ConnectorError('wake_bridge_update_required',422);
       const allowed = new Set(['forbidden','unauthorized','idempotency_conflict','call_busy','call_not_found','call_ended',
         'stale_epoch','call_not_ringing','call_not_active','reply_not_found','final_text_rewrite','revision_conflict','invalid_cursor','operation_retired','device_limit','role_identity_conflict','invalid_expression_prompt',
-        'sse_session_not_found','sse_session_limit','sse_queue_full','schedule_not_found','contact_not_found','oauth_limit']);
+        'sse_session_not_found','sse_session_limit','sse_queue_full','schedule_not_found','contact_not_found','oauth_limit','call_context_not_found']);
       const code = allowed.has(body.message) ? body.message : 'database_request_failed';
       const status = code === 'forbidden' || code === 'unauthorized' ? 403 : code.endsWith('_not_found') ? 404 : ['sse_session_limit','sse_queue_full','oauth_limit'].includes(code) ? 429 : allowed.has(code) ? 409 : 400;
       throw new ConnectorError(code, status);
@@ -28,6 +28,7 @@ export function createSupabaseStore(config, fetcher = fetch) {
     return body;
   }
   return {
+    resolveCallContext(owner,contact,prefix){return rpc('tincall_resolve_call_context',{p_owner:owner,p_contact:contact,p_prefix:prefix});},
     removePushDevice(owner,device){return rpc('tincall_remove_push_device',{p_owner:owner,p_device:device.device_id,p_binding:device.binding_id});},
     async authenticate(token) {
       const configured = (config.clients ?? []).find(client => client.token === token);

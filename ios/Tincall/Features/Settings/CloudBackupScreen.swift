@@ -37,7 +37,7 @@ struct CloudBackupScreen: View {
             .modifier(SettingsPageStyle(title: String(localized: "云端同步"), subtitle: String(localized: "在本机与自己的云端之间同步通话记录"), symbol: "icloud", index: "SYNC"))
         .task(id: isCallActive ? nil : connection?.id) {
             guard let connection, !isCallActive, !sync.isBusy, !sync.connected else { return }
-            await sync.refresh(connection: connection)
+            if await sync.refresh(connection: connection) { confirmation = .destination }
         }
         .alert("云端操作未完成", isPresented: Binding(get: { activeRecordID == nil && (sync.errorMessage != nil || loadingError != nil) }, set: { if !$0 { sync.clearError(); loadingError = nil } })) {
             Button("好", role: .cancel) { sync.clearError(); loadingError = nil }
@@ -108,7 +108,9 @@ struct CloudBackupScreen: View {
             Section {
                 Text(sync.status).font(.footnote)
                 if let connection {
-                    Button("刷新云端记录") { confirmation = .destination }
+                    Button("刷新云端记录") {
+                        run { if await sync.refresh(connection: connection) { confirmation = .destination } }
+                    }
                         .disabled(sync.isBusy || isCallActive)
                 }
                 if sync.isBusy {

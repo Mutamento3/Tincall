@@ -21,8 +21,10 @@ test('wake bridge drives opening and every input without hanging tools, recovers
   let snapshots=0;const snapshot=store.mcpCommand.bind(store);
   store.mcpCommand=async(...args)=>{if(args[2]==='snapshot')snapshots++;return snapshot(...args);};
   const connector=createConnector({store,config:{},schedule:()=>{}});
+  let taskCallID;
   const request=(path,token='phone',body,signal)=>new Request('https://fixture.invalid'+path,{
-    method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json, text/event-stream'},
+    method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json, text/event-stream',
+      ...(taskCallID && body?.method==='tools/call'?{'Tincall-Call-ID':taskCallID}:{})},
     ...(body?{body:JSON.stringify(body)}:{}),signal,
   });
   const post=async(path,body,token='phone')=>{
@@ -62,6 +64,7 @@ test('wake bridge drives opening and every input without hanging tools, recovers
     const response=await connector.handle(request('/wake/events',token,undefined,abort.signal));assert.equal(response.status,200);
     reader=response.body.getReader();assert.equal((await frame(reader)).event,'ready');
     const callID=crypto.randomUUID();
+    taskCallID=callID;
     await post('/calls',mutation({call_id:callID,contact_id:'linked',source:'mcp'}));
     const opening=await frame(reader);assert.equal(opening.event,'wake');assert.equal(opening.data.reason,'answered');
     assert.deepEqual(Object.keys(opening.data).sort(),['version','event_id','call_id','contact_id','reason','reply_to'].sort());
@@ -161,8 +164,10 @@ test('bridge MCP over SSE keeps bridge tools and returns after replying',async()
   const scheduled=[];
   const connector=createConnector({store,config:{},schedule:task=>scheduled.push(task)});
   const abort=new AbortController();let reader;
+  let taskCallID;
   const request=(path,token,body)=>new Request('https://fixture.invalid'+path,{
-    method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json, text/event-stream'},
+    method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json, text/event-stream',
+      ...(taskCallID && body?.method==='tools/call'?{'Tincall-Call-ID':taskCallID}:{})},
     ...(body?{body:JSON.stringify(body)}:{}),signal:abort.signal,
   });
   const post=async(path,token,body)=>{
@@ -193,6 +198,7 @@ test('bridge MCP over SSE keeps bridge tools and returns after replying',async()
     assert.equal(obsolete.isError,false);assert.match(obsolete.content[0].text,/无需等待/);
     await post('/calls','phone',{request_id:crypto.randomUUID(),call_id:crypto.randomUUID(),contact_id:'linked',source:'mcp'});
     const input=await (await connector.handle(request('/wake/input',token))).json();
+    taskCallID=input.structuredContent.call.id;
     const reply=await rpc('tools/call',{name:'tincall_reply',arguments:{text:'Synthetic SSE reply'}});
     assert.equal(reply.isError,false);assert.deepEqual(reply.content,[{type:'text',text:'已发送。'}]);
     assert.equal((await (await connector.handle(request('/wake/input',token))).json()).structuredContent.event,'idle');
@@ -206,7 +212,8 @@ test('bridge dial waits for answer in its initiating task without a duplicate op
   const store=createSQLiteStore({clients:[{token:'phone',owner_id:owner}]},join(directory,'db.sqlite'));
   const connector=createConnector({store,config:{},schedule:()=>{}});
   let reader;
-  const request=(path,token,body)=>new Request('https://fixture.invalid'+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json, text/event-stream'},...(body?{body:JSON.stringify(body)}:{})});
+  const taskCallID=crypto.randomUUID();
+  const request=(path,token,body)=>new Request('https://fixture.invalid'+path,{method:body?'POST':'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json',Accept:'application/json, text/event-stream',...(body?.method==='tools/call'?{'Tincall-Call-ID':taskCallID}:{})},...(body?{body:JSON.stringify(body)}:{})});
   const post=async(path,token,body)=>(await connector.handle(request(path,token,body))).json();
   try {
     await post('/mcp/roles/upsert','phone',{role_id:crypto.randomUUID(),contact_id:'linked',display_name:'Fixture'});
@@ -216,10 +223,10 @@ test('bridge dial waits for answer in its initiating task without a duplicate op
     const pending=post('/mcp/wake',token,{jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'tincall_call',arguments:{timeout_seconds:3}}}).then(result=>{settled=true;return result;});
     let call;
     for(let i=0;i<100;i++) {call=(await store.command(owner,'call.current')).call;if(call)break;await new Promise(resolve=>setTimeout(resolve,10));}
-    assert.equal(settled,false);assert.equal(call.status,'ringing');
+    assert.equal(settled,false);assert.equal(call.status,'ringing');assert.equal(call.id,taskCallID);
     await post(`/calls/${call.id}/answer`,'phone',{request_id:crypto.randomUUID(),epoch:0,user_name:'小白',expression_prompt:'Synthetic first-call instruction'});
     const answered=(await pending).result;assert.match(answered.content[0].text,/已接通/);assert.match(answered.content[0].text,/Synthetic first-call instruction/);
-    await post('/mcp/wake',token,{jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'tincall_reply',arguments:{text:'Hello'}}});
+    assert.equal((await post('/mcp/wake',token,{jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'tincall_reply',arguments:{text:'Hello'}}})).result.isError,false);
     await post(`/calls/${call.id}/input`,'phone',{request_id:crypto.randomUUID(),message_id:crypto.randomUUID(),epoch:0,text:'Next input'});
     assert.equal((await frame(reader)).data.reason,'input','answer belongs to the waiting dial task');
   } finally {await reader?.cancel();store.close();rmSync(directory,{recursive:true,force:true});}

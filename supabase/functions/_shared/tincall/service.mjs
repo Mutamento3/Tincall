@@ -124,7 +124,7 @@ export function createConnector({store, config, schedule = promise => promise.ca
           wake:{transport:'sse',url:baseURL+'/wake/events',headers:{Authorization:'Bearer '+saved.token},event:'wake'},
           input:{transport:'http',url:baseURL+'/wake/input',headers:{Authorization:'Bearer '+saved.token}},
           mcp:{transport:'streamable-http',url:baseURL+'/mcp/wake',headers:{Authorization:'Bearer '+saved.token}},
-          instructions:'Keep the wake connection outside AI tasks. Fetch input.url and drain has_more pages, deduplicating message IDs internally. Keep the linked conversation context across wakes. Supply the AI only message names/text and image content; include voice_instructions when present at call start. Do not pass call IDs, reply targets, epochs or cursors to the AI. The AI replies with tincall_reply text, then finishes the task. On idle or ended, do not start a task.'});
+          instructions:'Keep the wake connection outside AI tasks. Fetch input.url and drain has_more pages, deduplicating message IDs internally. Bind each AI task to input.call.id using the Tincall-Call-ID header in every MCP request for that task; never replace it with a later call. Keep the linked conversation context across wakes. Supply the AI only message names/text and image content; include voice_instructions when present at call start. Do not pass call IDs, reply targets, epochs or cursors to the AI. The AI replies with tincall_reply text, then finishes the task. On idle or ended, do not start a task.'});
       }
       if(path==='/calls/incoming/events')return await incomingEvents(request,principal);
       if(path==='/mcp/wake'){ensure(principal.wake_bridge,'forbidden',403);return await mcp(request,principal);}

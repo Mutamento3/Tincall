@@ -204,8 +204,8 @@ final class ExternalCallClient {
         incomingSession = URLSession(configuration: incomingConfiguration, delegate: NoConnectorRedirects(), delegateQueue: nil)
     }
 
-    func validate(_ connection: ConnectionProfile, tokenOverride: String? = nil) throws {
-        try DataSharingConsent.require(connection)
+    func validate(_ connection: ConnectionProfile, tokenOverride: String? = nil, allowDeviceRemoval: Bool = false) throws {
+        if !allowDeviceRemoval || !DataSharingConsent.isCleanupAllowed(connection) { try DataSharingConsent.require(connection) }
         guard connection.provider == .genericConnector,
               let url = connection.endpoint, url.scheme == "https", url.host != nil,
               url.user == nil, url.password == nil, url.query == nil, url.fragment == nil else {
@@ -294,6 +294,7 @@ final class ExternalCallClient {
                                 live_activity_start_token: liveActivityStartToken,
                                 calls_valid_until: validUntil.map { ISO8601DateFormatter().string(from: $0) }))
         guard result.ok else { throw TincallError(message: String(localized: "连接端没有确认设备绑定")) }
+        DataSharingConsent.rememberDeviceBinding(connection)
         if validUntil != nil && result.call_access_expiry != true {
             try await removeDevice(connection: connection, deviceID: deviceID, requestID: UUID())
             throw TincallError(message: String(localized: "请先更新云端与推送服务，再开启试用版的后台来电"))
@@ -505,7 +506,7 @@ final class ExternalCallClient {
                                                            body: Body?, query: [URLQueryItem] = [], tokenOverride: String? = nil,
                                                            logContext: RequestLogContext? = nil, logService: RequestLogService? = nil,
                                                            longPoll: Bool = false, timeout: TimeInterval? = nil) async throws -> Result {
-        try validate(connection, tokenOverride: tokenOverride)
+        try validate(connection, tokenOverride: tokenOverride, allowDeviceRemoval: path == ["devices", "remove"] && method == "POST")
         guard var url = connection.endpoint else { throw TincallError(message: String(localized: "连接端缺少地址")) }
         for component in path { url.appendPathComponent(component) }
         guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {

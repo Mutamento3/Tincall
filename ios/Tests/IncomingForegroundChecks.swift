@@ -114,6 +114,7 @@ private final class AnswerCallController: CXCallController, @unchecked Sendable 
         if CommandLine.arguments.contains("--activity-after-answer") { try await checkIncomingActivitySuppression(); return }
         if CommandLine.arguments.contains("--missed-call") { try await checkMissedCaller(); return }
         if CommandLine.arguments.contains("--answer") { try await checkAnswer(); return }
+        if CommandLine.arguments.contains("--consent") { try await checkIncomingConsent(); return }
         var role = CallRole(name: "Synthetic")
         role.linkedContact = LinkedContact(identifier: "synthetic-id", name: "Synthetic", phoneNumber: " +12025550123 ", emailAddress: "fixture@example.invalid")
         precondition(IncomingCallController.callerHandle(for: role).type == .phoneNumber)
@@ -171,6 +172,29 @@ private final class AnswerCallController: CXCallController, @unchecked Sendable 
         print("PASS: subscription failures are visible, reconnects back off and stopping clears the error")
         try await checkBindings()
         try await checkAnswer()
+    }
+
+    @MainActor static func checkIncomingConsent() async throws {
+        let suite = "TincallIncomingConsent-\(UUID())"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let client = ExternalCallClient(), provider = AnswerProvider(configuration: CXProviderConfiguration())
+        let controller = IncomingCallController(client: client, defaults: defaults, provider: provider)
+        let connection = ConnectionProfile(name: "Synthetic", provider: .genericConnector, endpoint: URL(string: "https://synthetic.invalid"))
+        let role = CallRole(name: "Synthetic")
+        var ringing = 0
+        controller.canAcceptCall = { true }
+        controller.canUseConnections = { _, _ in false }
+        controller.onResolveRole = { _, _, _ in role }
+        controller.onRing = { _, _, _ in ringing += 1 }
+        controller.monitorForeground(connections: [connection], active: true)
+        try await until { client.callbacks[connection.id] != nil }
+        client.callbacks[connection.id]?(ExternalCallState())
+        try await until { provider.ended }
+        precondition(ringing == 0 && controller.answeringCall == nil)
+        precondition(controller.errorMessage?.contains("尚未授权") == true)
+        controller.monitorForeground(connections: [], active: false)
+        print("PASS: missing data-sharing permission ends the system invitation before ringing preparation or answering")
     }
 
     @MainActor static func checkInitialCallerHandle() async throws {

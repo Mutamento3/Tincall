@@ -56,7 +56,7 @@ before(async()=>{
     execFileSync('docker',['run','--rm','-d','--name',container,'-e','POSTGRES_HOST_AUTH_METHOD=trust','postgres:18-alpine'],{stdio:'pipe'});
     let ready=false;for(let i=0;i<60;i++){try{sql('select 1');ready=true;break;}catch{await new Promise(r=>setTimeout(r,100));}}assert.ok(ready);
     sql(readFileSync(new URL('./bootstrap.sql',import.meta.url),'utf8'));
-    for(const file of ['202610110001_tincall_connector.sql','202610140001_tincall_mcp_roles.sql','202610200003_tincall_mcp_oauth.sql','202610200004_tincall_call_presence.sql','202610220001_tincall_service_safety.sql'])sql(readFileSync(new URL('../../supabase/migrations/'+file,import.meta.url),'utf8'));
+    for(const file of ['202610110001_tincall_connector.sql','202610140001_tincall_mcp_roles.sql','202610200003_tincall_mcp_oauth.sql','202610200004_tincall_call_presence.sql','202610220001_tincall_service_safety.sql','202610220002_tincall_mcp_safety.sql'])sql(readFileSync(new URL('../../supabase/migrations/'+file,import.meta.url),'utf8'));
     store=createSupabaseStore({supabaseURL:'https://local-database.invalid',serviceKey:'fixture',publicKey:'fixture',clients},async(url,init)=>{
       const p=JSON.parse(init.body);let call;
       if(url.endsWith('/tincall_oauth'))call=`tincall_oauth(${quote(p.p_action)},${quote(JSON.stringify(p.p_payload))}::jsonb)`;
@@ -152,6 +152,32 @@ test('registration reclaims idle clients, preserves live authorization and persi
   await register();
 });
 
+
+test('OAuth capacity pressure evicts idle registrations while preserving live grants and pending approvals',async()=>{
+  if(postgres)sql("update public.tincall_oauth_clients set created_at=now()-interval '2 minutes';");
+  else db.prepare('UPDATE tincall_oauth_clients SET created_at=?').run(new Date(Date.now()-120000).toISOString());
+  const live=await pending(),waiting=await pending();
+  const authorization=await approve(live);
+  assert.equal((await exchange(live,authorization)).status,200);
+  if(postgres)sql(`insert into public.tincall_oauth_clients(client_id,client_name,redirect_uris,created_at)
+    select 'capacity-'||n,'Fixture','[]'::jsonb,now()-interval '2 minutes'
+    from generate_series(1,1000-(select count(*)::integer from public.tincall_oauth_clients)) n;`);
+  else {
+    const count=db.prepare('SELECT count(*) n FROM tincall_oauth_clients').get().n;
+    const insert=db.prepare("INSERT INTO tincall_oauth_clients(client_id,client_name,redirect_uris,created_at) VALUES (?,'Fixture','[]',?)");
+    for(let n=count;n<1000;n++)insert.run('capacity-'+n,new Date(Date.now()-120000).toISOString());
+  }
+  await register();
+  assert.ok(await store.oauthCommand('client.get',{client_id:live.client}));
+  assert.ok(await store.oauthCommand('client.get',{client_id:waiting.client}));
+  const idle=await register();
+  if(postgres)sql(`update public.tincall_oauth_clients set created_at=now()-interval '20 minutes' where client_id=${quote(idle)};`);
+  else db.prepare('UPDATE tincall_oauth_clients SET created_at=? WHERE client_id=?').run(new Date(Date.now()-1200000).toISOString(),idle);
+  await register();
+  assert.equal(await store.oauthCommand('client.get',{client_id:idle}),null,'unused registrations expire well before 24 hours');
+  assert.ok(await store.oauthCommand('client.get',{client_id:live.client}));
+  assert.ok(await store.oauthCommand('client.get',{client_id:waiting.client}));
+});
 
 test('obsolete push cleanup preserves a concurrently replaced binding and is not callable by anonymous clients',async()=>{
   const device=crypto.randomUUID();const old='synthetic-old-binding';const current='synthetic-new-binding';

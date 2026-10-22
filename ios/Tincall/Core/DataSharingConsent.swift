@@ -47,15 +47,35 @@ enum DataSharingConsent {
     }
 
     static func isAllowed(_ connection: ConnectionProfile, defaults: UserDefaults = .standard) -> Bool {
-        connection.provider == .appleSpeech || (canAuthorize(connection) && defaults.stringArray(forKey: key(connection)) == destination(connection))
+        connection.provider == .appleSpeech || (canAuthorize(connection) && defaults.stringArray(forKey: key(connection)) == destination(connection) && !defaults.bool(forKey: key(connection) + ".revoked"))
+    }
+
+    static func isCleanupAllowed(_ connection: ConnectionProfile, defaults: UserDefaults = .standard) -> Bool {
+        canAuthorize(connection) && [key(connection), key(connection) + ".deviceBinding"].contains { defaults.stringArray(forKey: $0) == destination(connection) }
+    }
+
+    static func rememberDeviceBinding(_ connection: ConnectionProfile, defaults: UserDefaults = .standard) {
+        guard connection.provider == .genericConnector, canAuthorize(connection) else { return }
+        defaults.set(destination(connection), forKey: key(connection) + ".deviceBinding")
+    }
+
+    static func permitsIncomingCall(role: CallRole, connector: ConnectionProfile, connections: [ConnectionProfile], defaultSTT: UUID?, defaults: UserDefaults = .standard) -> Bool {
+        guard isAllowed(connector, defaults: defaults) else { return false }
+        var needed = [defaultSTT ?? role.sttConnectionID, role.ttsConnectionID]
+        if role.effectiveCallMode == .standalone { needed.append(role.modelConnectionID) }
+        return needed.allSatisfy { id in
+            guard let id, let connection = connections.first(where: { $0.id == id }) else { return false }
+            return isAllowed(connection, defaults: defaults)
+        }
     }
 
     static func setAllowed(_ allowed: Bool, for connection: ConnectionProfile, defaults: UserDefaults = .standard) {
         if allowed {
             guard canAuthorize(connection) else { return }
             defaults.set(destination(connection), forKey: key(connection))
+            defaults.removeObject(forKey: key(connection) + ".revoked")
         }
-        else { defaults.removeObject(forKey: key(connection)) }
+        else { defaults.set(true, forKey: key(connection) + ".revoked") }
     }
 
     static func require(_ connection: ConnectionProfile) throws {

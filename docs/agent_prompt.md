@@ -16,13 +16,15 @@
 参数及必填项以 tools/list 为准：
 • tincall_call(contact_id?)：向手机发起来电，等待接听后返回，随后可通过 tincall_reply 打招呼。联系人专用凭据无需参数；其他身份按工具定义填写 contact_id。
 • tincall_get_call(call_id?, limit?, before_sequence?)：查看保存的通话文字、图片和当前状态；结束的通话可能另有摘要。按结果指引翻阅更早记录。日常对话使用 tincall_wait。
-• tincall_wait()：等待新消息、接听或挂断，单次最多两分钟。超时继续调用，不会挂断；播放停止不会让等待提前结束。
-• tincall_reply(text, wait_for_input?)：用 text 一次提交完整回复，默认继续等下一句话。告别时设置 wait_for_input:false，再调用 tincall_end。
-• tincall_end()：通知手机等已收到的回复播放完成后挂断。手机手动挂断仍立即结束。
+• tincall_wait(call?)：等待新消息、接听或挂断，单次最多两分钟。沿用本通电话返回的 8 字符 call 标记；仅发现新通话时省略。超时继续调用，不会挂断；播放停止不会让等待提前结束。
+• tincall_reply(call, text, wait_for_input?)：原样带回产生本次任务的 call 短标记，用 text 一次提交完整回复，默认继续等下一句话。告别时设置 wait_for_input:false，再调用 tincall_end。
+• tincall_end(call)：沿用同一个 call 短标记，通知手机等已收到的回复播放完成后挂断。手机手动挂断仍立即结束。
 • tincall_list_calls(limit?, before?)：列出保存的通话，按结果指引继续翻页，再用 get_call 查看选中的记录。
 
 三、接听、回复与续等
-用户要求主动打来时直接调用 tincall_call()，等接通结果返回后用 tincall_reply 提交问候。普通通话的工具结果直接包含用户名与发言，回复只需正文；图片通过 MCP image content 返回，应读取实际图片内容。
+用户要求主动打来时直接调用 tincall_call()，等接通结果返回后用 tincall_reply 提交问候。普通通话的工具结果直接包含用户名与发言，回复提交完整正文；图片通过 MCP image content 返回，应读取实际图片内容。
+
+普通 MCP 的工具结果另有一行 `call: XXXXXXXX`。回复、挂断和继续等待时只需带回这个 8 字符标记，不需要 UUID、轮次或游标。它绑定原通话；原通话结束后迟到操作会被拒绝，不要换用新通话的标记重发旧回复或挂断指令。更新服务后，请在平台刷新工具定义或重新连接。
 
 朗读要求在通话开始时提供一次，平台需保留同一对话的上下文并遵循要求。AI 写完全文再调用 tincall_reply。手机打断播放后，后续提交的完整回复仍可正常接收；等待应继续到用户说完并提交新消息。
 
@@ -31,6 +33,8 @@
 MCP＋唤醒桥接法
 
 在联系人编辑页的 MCP 模式中选择唤醒桥并保存，复制这位联系人的唤醒桥配置。接入程序负责持续订阅事件、读取完整输入，再启动外部 AI 任务；可使用仓库中的 connector/wake-adapter.mjs，具体配置按 connector/README.md 操作。平台启动命令需续接同一对话，带入用户名、正文、实际图片和首次朗读要求，并配置专用 MCP。AI 使用 tincall_reply 提交完整 text 后结束任务，新消息再触发下一次任务，无需调用 wait。仅导入普通 MCP 地址不会自动启动闲置的 AI。
+
+唤醒桥由适配器在任务专用的 MCP 请求头里自动绑定原通话，AI 仍然只提交 text，不需要填写 call。使用其他适配器时，也必须将取到的 `input.call.id` 固定到该任务每次 MCP 请求的 `Tincall-Call-ID` 头，不能换成后来的通话。
 
 四、平台边界
 Kelivo 的 MCP 请求超时默认 30 秒，需在其 MCP 设置里调至 180 秒并重新连接 Tincall。Tincall 单次最长等待 120 秒，回复调用还包括手机朗读和等用户说话的时间；客户端的等待时间应比服务端更长。云端更新工具定义后，需要刷新平台工具列表或重新连接。

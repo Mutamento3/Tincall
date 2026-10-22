@@ -131,6 +131,36 @@
       }
     }
   },
+  "此来电所需连接尚未授权，请打开 App 确认数据发送授权。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "A service required for this call has not been authorized. Open the app to review data-sharing permission."
+        }
+      }
+    }
+  },
+  "关闭授权后，仍可向原服务发送设备解绑请求，以停用后台来电。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "After revoking permission, you can still send a device-unbinding request to the original service to disable background calls."
+        }
+      }
+    }
+  },
+  "迁移：MCP 通话与授权保护": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Migration: MCP call and authorization safeguards"
+        }
+      }
+    }
+  },
   "迁移：授权注册与推送清理": {
     "localizations": {
       "en": {

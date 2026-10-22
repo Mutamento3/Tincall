@@ -17,15 +17,19 @@ const waitProperties = {
 const toolDefinitions = [
   ['tincall_call', 'Call the linked phone and wait for the person to answer. When answered, speak by calling tincall_reply with your complete text. If nobody answers within two minutes, call tincall_wait to keep waiting.', {contact_id:{type:'string'},timeout_seconds:waitProperties.timeout_seconds}, ['contact_id']],
   ['tincall_get_call', 'Read saved conversation history and current call state. An ended call may also have a summary. For live conversation use tincall_wait; after a timeout keep waiting. History is paged, newest page first.', {call_id:{type:'string'},limit:{type:'integer',minimum:1,maximum:100,default:50},before_sequence:{type:'integer',minimum:1}}, []],
-  ['tincall_wait', 'Wait for the next message, phone answer or hangup. Returns new messages directly. After a timeout call tincall_wait again; the call stays connected.', {timeout_seconds:waitProperties.timeout_seconds}, []],
-  ['tincall_reply', 'Speak your complete reply in the current call. Only text is required. Then wait for the next message. For a goodbye, set wait_for_input:false and call tincall_end.', {text:{type:'string'},wait_for_input:{type:'boolean',default:true},timeout_seconds:waitProperties.timeout_seconds}, ['text']],
-  ['tincall_end', 'Hang up after the phone finishes reading your reply. For a goodbye, send tincall_reply with wait_for_input:false first. No parameters needed.', {}, []],
+  ['tincall_wait', 'Wait for the next message, phone answer or hangup. Reuse the short call marker for this task; omit call only to discover a new call. After a timeout keep waiting.', {call:{type:'string',minLength:8,maxLength:8},timeout_seconds:waitProperties.timeout_seconds}, []],
+  ['tincall_reply', 'Speak your complete reply. Copy the 8-character call marker from the input that produced this task. Never substitute a new call marker to retry an old reply. For a goodbye, set wait_for_input:false and call tincall_end with the same marker.', {call:{type:'string',minLength:8,maxLength:8},text:{type:'string'},wait_for_input:{type:'boolean',default:true},timeout_seconds:waitProperties.timeout_seconds}, ['call','text']],
+  ['tincall_end', 'Hang up after the phone finishes reading your reply. Copy the same 8-character call marker that produced this task. Never substitute another call to retry an old hangup.', {call:{type:'string',minLength:8,maxLength:8}}, ['call']],
   ['tincall_list_calls', 'List saved calls. Use get_call to read a selected conversation and any available summary.', {limit:{type:'integer',minimum:1,maximum:50,default:10},before:{type:'object',properties:{started_at:{type:'string'},call_id:{type:'string'}},required:['started_at','call_id'],additionalProperties:false}}, []],
 ].map(([name, description, properties, required]) => ({name, description, inputSchema:{type:'object',properties,required,additionalProperties:false}}));
 
 function replyReference(reply) {
   const bytes = reply.reply_id.replaceAll('-', '').match(/../g).map(value => parseInt(value, 16));
   return `${reply.epoch}.${btoa(String.fromCharCode(...bytes)).replaceAll('+','-').replaceAll('/','_').replace(/=+$/, '')}`;
+}
+export function callReference(id) {
+  const bytes=id.replaceAll('-','').slice(0,12).match(/../g).map(value=>parseInt(value,16));
+  return btoa(String.fromCharCode(...bytes)).replaceAll('+','-').replaceAll('/','_');
 }
 // Owns reply targets, long waits, and both MCP transports, including wake subscriptions.
 export function createMCP({store, command, ensureOpening, schedule, mcpContent}) {
@@ -38,13 +42,21 @@ export function createMCP({store, command, ensureOpening, schedule, mcpContent})
     }
     return {...value,call:publicCall(value.call),reply:value.reply ? {...value.reply,reply_to:replyReference(value.reply)} : null};
   }
-  async function currentMCPCall(principal, signal) {
-    const value = await mcpSnapshot(principal, {}, signal);
-    if (!value.call) throw new ConnectorError('no_active_call', 409, {message:'当前没有通话。'});
-    return value.call;
+  async function boundCallID(principal,args) {
+    const bound=principal.mcp_call_id;
+    ensure(!principal.wake_bridge || bound,'call_context_required',409);
+    if(bound) {
+      ensure(args.call===undefined || args.call===callReference(bound),'call_context_mismatch',409);
+      ensure(args.call_id===undefined || args.call_id.toLowerCase()===bound,'call_context_mismatch',409);
+      return bound;
+    }
+    ensure(typeof args.call==='string' && /^[A-Za-z0-9_-]{8}$/.test(args.call),'call_context_required',409);
+    const prefix=Array.from(atob(args.call.replaceAll('-','+').replaceAll('_','/')),char=>char.charCodeAt(0).toString(16).padStart(2,'0')).join('');
+    const {call_id}=await store.resolveCallContext(principal.owner_id,principal.contact_id??null,prefix);
+    return uuid(call_id,'call_id').toLowerCase();
   }
   async function waitForInput(principal, args, signal) {
-    let callId = args.call_id;
+    let callId = principal.mcp_call_id || args.call!==undefined ? await boundCallID(principal,args) : args.call_id;
     if (callId === undefined) {
       const current = await mcpSnapshot(principal, {}, signal);
       if (!current.call) return {...current,event:'ended',message:'当前没有进行中的通话。'};
@@ -92,15 +104,15 @@ export function createMCP({store, command, ensureOpening, schedule, mcpContent})
     ensure(typeof args.text==='string' && args.text.trim().length>0 && args.text.length<=100000,'invalid_text');
     ensure(args.wait_for_input===undefined || typeof args.wait_for_input==='boolean','invalid_wait_for_input');
     const timeoutSeconds=waitTimeout(args.timeout_seconds);
-    const call=await currentMCPCall(principal,signal);
+    const callID=await boundCallID(principal,args);
     const accepted=await store.mcpCommand(principal.owner_id,principal.contact_id??null,'send',{
-      call_id:call.id,request_id:crypto.randomUUID(),text:args.text,
+      call_id:callID,request_id:crypto.randomUUID(),text:args.text,
     });
     if (principal.wake_bridge || args.wait_for_input===false) return {value:{...accepted,event:'sent'},cursor:accepted.cursor};
     try {
       // A submitted reply confirms the call is connected, even without a prior wait.
-      await store.mcpCommand(principal.owner_id,principal.contact_id??null,'delivered',{call_id:call.id,...accepted.cursor});
-      return {value:{reply_accepted:true,...await waitForInput(principal,{call_id:call.id,timeout_seconds:timeoutSeconds},signal)},cursor:accepted.cursor};
+      await store.mcpCommand(principal.owner_id,principal.contact_id??null,'delivered',{call_id:callID,...accepted.cursor});
+      return {value:{reply_accepted:true,...await waitForInput(principal,{call_id:callID,timeout_seconds:timeoutSeconds},signal)},cursor:accepted.cursor};
     } catch(error) {
       return {value:{...accepted,wait_error:{code:error instanceof ConnectorError?error.code:'wait_failed'}},cursor:accepted.cursor};
     }
@@ -109,6 +121,9 @@ export function createMCP({store, command, ensureOpening, schedule, mcpContent})
   // Render media before advancing delivery, so a failed image load is retryable.
   async function renderResult(principal,value) {
     const content=await mcpContent(principal,{...value,voice_instructions:null});
+    if(!principal.wake_bridge && value.call && value.call.status!=='ended' && !value.error) {
+      content.push({type:'text',text:`call: ${callReference(value.call.id)}`});
+    }
     if(value.voice_instructions && value.call?.status==='active') {
       const {voice_instructions:instructions}=await store.claimVoiceInstructions(principal.owner_id,value.call.id);
       if(instructions) {
@@ -130,6 +145,7 @@ export function createMCP({store, command, ensureOpening, schedule, mcpContent})
     const accept=request.headers.get('accept') ?? '';
     ensure(accept.includes('application/json') && accept.includes('text/event-stream'),'mcp_accept_required',406);
     const message=await readJSON(request);
+    if(request.headers.has('Tincall-Call-ID'))principal={...principal,mcp_call_id:uuid(request.headers.get('Tincall-Call-ID'),'call_id').toLowerCase()};
     return mcpMessage(message,principal,PROTOCOLS,request.signal);
   }
 
@@ -146,13 +162,16 @@ export function createMCP({store, command, ensureOpening, schedule, mcpContent})
     else if(message.method==='tools/list') result={tools:toolDefinitions.filter(tool=>!principal.wake_bridge || tool.name!=='tincall_wait').map(tool => {
       const hidden = new Set(['timeout_seconds']);
       if(principal.wake_bridge)hidden.add('wait_for_input');
+      if(principal.wake_bridge)hidden.add('call');
       if (tool.name === 'tincall_call' || tool.name === 'tincall_end') hidden.add('request_id');
       if (['tincall_call','tincall_end','tincall_reply','tincall_wait'].includes(tool.name)) hidden.add('call_id');
       if (tool.name === 'tincall_reply') { hidden.add('reply_id'); hidden.add('epoch'); }
       if (tool.name === 'tincall_end') hidden.add('epoch');
       if (tool.name === 'tincall_call' && principal.contact_id) hidden.add('contact_id');
-      const bridgeDescription=principal.wake_bridge && tool.name==='tincall_reply'
-        ? 'Speak your complete reply using text, then finish this task. New messages trigger another wake.' : null;
+      const bridgeDescription=principal.wake_bridge ? {
+        tincall_reply:'Speak your complete reply using text, then finish this task. The adapter binds this task to its original call. New messages trigger another wake.',
+        tincall_end:'Hang up the call bound to this task after the phone finishes reading your reply. No parameters needed.',
+      }[tool.name] : null;
       return {...tool,...(bridgeDescription?{description:bridgeDescription}:{}),inputSchema:{...tool.inputSchema,
         properties:Object.fromEntries(Object.entries(tool.inputSchema.properties).filter(([key]) => !hidden.has(key))),
         required:tool.inputSchema.required.filter(key => !hidden.has(key))}};
@@ -164,15 +183,24 @@ export function createMCP({store, command, ensureOpening, schedule, mcpContent})
         if (!definition) return json({jsonrpc:'2.0',id:message.id,error:{code:-32601,message:'Unknown tool'}});
         if (!Object.keys(args).every(key => Object.hasOwn(definition.inputSchema.properties, key))) {
           throw new ConnectorError('invalid_arguments', 400, params.name === 'tincall_reply'
-            ? {message:'回复未发送：只需传 text 正文，请移除多余参数后重试。'} : {});
+            ? {message:'回复未发送：请按当前工具定义提交正文和必要参数，移除多余参数后重试。'} : {});
         }
         switch(params.name) {
           case 'tincall_call':
-            try { value=await command(principal,'call.incoming',{...args,request_id:args.request_id ?? crypto.randomUUID(),call_id:args.call_id ?? crypto.randomUUID(),contact_id:args.contact_id ?? principal.contact_id,source:'mcp'}); }
+            if(principal.wake_bridge || principal.mcp_call_id) {
+              const bound=await boundCallID(principal,args);
+              try {
+                const original=await mcpSnapshot(principal,{call_id:bound},signal);
+                ensure(original.call.status!=='ended','call_ended',409);
+              } catch(error) {
+                if(!(error instanceof ConnectorError && error.code==='call_not_found'))throw error;
+              }
+            }
+            try { value=await command(principal,'call.incoming',{...args,request_id:args.request_id ?? crypto.randomUUID(),call_id:principal.mcp_call_id ?? crypto.randomUUID(),contact_id:args.contact_id ?? principal.contact_id,source:'mcp'}); }
             catch (error) {
               if (!(error instanceof ConnectorError && error.code === 'call_busy')) throw error;
               const current=await mcpSnapshot(principal,{},signal);
-              if (args.call_id === undefined && args.request_id === undefined && current.call?.source === 'mcp' &&
+              if ((!principal.mcp_call_id || current.call?.id===principal.mcp_call_id) && args.request_id === undefined && current.call?.source === 'mcp' &&
                   current.call.contact_id === (args.contact_id ?? principal.contact_id)) {
                 value = {...current,reused:true};
               } else value={error:{code:'call_busy',message:'云端仍有未结束的通话记录。请在 Tincall 检查云端通话状态。'},call:current.call};
@@ -189,6 +217,7 @@ export function createMCP({store, command, ensureOpening, schedule, mcpContent})
             }
             break;
           case 'tincall_get_call': {
+            if(principal.mcp_call_id)args.call_id=await boundCallID(principal,args);
             if (args.call_id !== undefined) uuid(args.call_id,'call_id');
             if (args.before_sequence !== undefined) ensure(integer(args.before_sequence,'before_sequence')>0,'invalid_before_sequence');
             const limit=args.limit === undefined ? 50 : args.limit; ensure(Number.isSafeInteger(limit) && limit>=1 && limit<=100,'invalid_limit');
@@ -206,11 +235,11 @@ export function createMCP({store, command, ensureOpening, schedule, mcpContent})
             const replied=await replyAndWait(principal,args,signal);value=replied.value;acceptedCursor=replied.cursor;break;
           }
           case 'tincall_end': {
-            if (args.call_id !== undefined) uuid(args.call_id,'call_id');
+            const callID=await boundCallID(principal,args);
             if (args.epoch !== undefined) integer(args.epoch,'epoch');
             const request_id = uuid(args.request_id ?? crypto.randomUUID(),'request_id');
-            const snapshot = await mcpSnapshot(principal,args.call_id === undefined ? {} : {call_id:args.call_id},signal);
-            if (!snapshot.call) { value={call:null,event:'ended'}; break; }
+            const snapshot = await mcpSnapshot(principal,{call_id:callID},signal);
+            ensure(snapshot.call.status!=='ended','call_ended',409);
             const call_id = snapshot.call.id, epoch = args.epoch ?? snapshot.call.epoch;
             // Finalize any stored streaming tail before the ordered end event.
             // A newer user turn still causes stale_epoch; never close over new input.
@@ -302,6 +331,7 @@ export function createMCP({store, command, ensureOpening, schedule, mcpContent})
     ensure(request.method==='POST','method_not_allowed',405);
     const session=uuid(url.searchParams.get('session_id'),'session_id');
     await store.sseCommand(principal,'check',{session_id:session});
+    if(request.headers.has('Tincall-Call-ID'))principal={...principal,mcp_call_id:uuid(request.headers.get('Tincall-Call-ID'),'call_id').toLowerCase()};
     const message=await readJSON(request);
     ensure(message.jsonrpc==='2.0' && typeof message.method==='string','invalid_rpc');
     // POST acknowledgement must not wait for a long-running tool. Its response

@@ -15,6 +15,7 @@ final class CloudSyncStore {
     private(set) var hasPendingOperation = false
     private(set) var canDiscardPending = false
     private(set) var connected = false
+    private(set) var requiresDestinationConfirmation = false
     @ObservationIgnored private let records: CallRecordStore
     @ObservationIgnored private let client: CloudSyncClient
     @ObservationIgnored private let transfer: CloudRecordTransfer
@@ -130,7 +131,8 @@ final class CloudSyncStore {
         mediaEnabled = enabled
     }
 
-    func refresh(connection: ConnectionProfile, confirmDestinationChange: Bool = false) async {
+    @discardableResult
+    func refresh(connection: ConnectionProfile, confirmDestinationChange: Bool = false) async -> Bool {
         await perform {
             try await self.bind(connection, allowDestinationChange: confirmDestinationChange)
             self.remoteRecords = try await self.client.list(connection: connection)
@@ -138,6 +140,7 @@ final class CloudSyncStore {
             try self.clearAutomaticRetry(connection)
             self.status = String(localized: "已连接云端，共 \(self.remoteRecords.count) 通记录。尚未上传本机内容。")
         }
+        return requiresDestinationConfirmation
     }
 
     func synchronize(connection: ConnectionProfile) async {
@@ -456,7 +459,10 @@ final class CloudSyncStore {
         guard let endpoint = connection.endpoint?.absoluteString else { throw TincallError(message: String(localized: "云端地址缺失")) }
         if let previous, previous.connectionID != connection.id || previous.endpoint != endpoint || previous.ownerID != owner {
             remoteRecords = []; conflicts = []; connected = false
-            if !allowDestinationChange { throw TincallError(message: String(localized: "同步目标或所属账户已变更，请重新读取云端列表后操作")) }
+            if !allowDestinationChange {
+                requiresDestinationConfirmation = true
+                throw TincallError(message: String(localized: "同步目标或所属账户已变更，请重新读取云端列表后操作"))
+            }
         }
         var next = state
         let index: Int
@@ -610,7 +616,7 @@ final class CloudSyncStore {
         guard !isBusy else { return }
         if let connection = automaticConnection, let retry = state.automaticRetries[connection.id.uuidString],
            retry.endpoint == connection.endpoint?.absoluteString, retry.retryAfter > Date() { return }
-        isBusy = true; errorMessage = nil
+        isBusy = true; errorMessage = nil; requiresDestinationConfirmation = false
         status = String(localized: "正在连接云端…")
         defer { isBusy = false }
         do {
@@ -621,7 +627,7 @@ final class CloudSyncStore {
         catch is CancellationError { status = String(localized: "操作已暂停，已保存的本机内容和待完成请求保留") }
         catch {
             if let conflict = error as? CloudRecordTransfer.Conflict { conflicts.insert(conflict.recordID) }
-            errorMessage = error.localizedDescription
+            errorMessage = requiresDestinationConfirmation ? nil : error.localizedDescription
             status = String(localized: "操作未完成，请查看错误后处理")
             if let connection = automaticConnection {
                 let endpoint = connection.endpoint?.absoluteString ?? ""

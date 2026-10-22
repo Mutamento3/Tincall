@@ -23,7 +23,7 @@ Tincall 是最低支持 iOS 26 的原生 AI 语音通话 App。支持手机直�
 | 方式 | AI 与上下文在哪里 | 需要准备什么 | 回复方式 |
 | --- | --- | --- | --- |
 | [独立模式](#开始使用) | 手机直连所选模型 API | 模型、STT、TTS 的配置；日常通话不需要云端 | 模型增量流式回复，手机分段合成播放 |
-| [普通 MCP](docs/agent_prompt.md) | 外部 AI 平台 | Tincall 连接端、对应联系人的 MCP 配置、正在运行并能调用工具的 AI | AI 用 `tincall_reply({text})` 提交完整回复，默认等待下一句话 |
+| [普通 MCP](docs/agent_prompt.md) | 外部 AI 平台 | Tincall 连接端、对应联系人的 MCP 配置、正在运行并能调用工具的 AI | AI 用 `tincall_reply({call, text})` 提交完整回复，`call` 为工具返回的 8 字符通话标记，默认等待下一句话 |
 | [MCP＋唤醒桥](connector/README.md#唤醒桥接入) | 外部 AI 平台 | 连接端、唤醒订阅程序、平台任务启动命令及专用 MCP | 收到事件启动一轮，提交完整回复后结束；新输入再唤醒 |
 | [后端模式](docs/agent_prompt.md) | 接入方自己的后端 | 完整实现手机通话协议，或复用连接端只接生成和取消 | 支持流式增量和完整回复，由后端选择 |
 
@@ -45,6 +45,8 @@ Tincall 是最低支持 iOS 26 的原生 AI 语音通话 App。支持手机直�
 4. **验证一通电话**：先确认服务和模型可达，再检查实际收音、回复、播放、打断和挂断。
 
 手机手动挂断立即停止生成和播放；普通打断保留通话。AI 通过 MCP 挂断时，手机等待已收到回复播放排空，失败也会退出收尾。已收到内容保留并标注中断原因。
+
+旧版升级或恢复配置后，若所需服务尚未授权，请在对应连接设置确认后再通话。普通 App 更新不会清空已有授权，但配置备份不包含授权记录。
 
 ### 连接端与现成适配器
 
@@ -147,7 +149,7 @@ A connector is a service you deploy in your own cloud, on a computer, or on a se
 | Mode | Where the AI and context run | What you need | How replies arrive |
 | --- | --- | --- | --- |
 | [Standalone](docs/setup.en.md#make-a-first-standalone-call) | The iPhone connects directly to your chosen model API | Model, STT, and TTS settings; no connector is needed for everyday calls | Streaming model output, synthesized and played in segments on the phone |
-| [Standard MCP](docs/setup.en.md#connect-an-external-ai) | An external AI platform | A Tincall connector, the contact's MCP configuration, and a running AI that can call tools | The AI submits a complete reply with `tincall_reply({text})`, then waits for the next input by default |
+| [Standard MCP](docs/setup.en.md#connect-an-external-ai) | An external AI platform | A Tincall connector, the contact's MCP configuration, and a running AI that can call tools | The AI submits a complete reply with `tincall_reply({call, text})`, copying the returned 8-character call marker, then waits for the next input by default |
 | [MCP with a wake bridge](docs/setup.en.md#connect-an-external-ai) | An external AI platform | A connector, an event subscriber, a platform task command, and the dedicated MCP configuration | Each event starts a task; the AI submits a complete reply and ends the task, then wakes again for new input |
 | [Backend](docs/setup.en.md#connect-an-external-ai) | Your own backend | Implement the phone protocol, or reuse the connector and supply generation and cancellation endpoints | Streaming deltas or complete replies, as implemented by your backend |
 
@@ -169,6 +171,8 @@ Model, speech, and self-hosting costs depend on their respective providers; purc
 4. **Test a complete call.** Check service and model availability, then verify audio capture, replies, playback, interruption, and hang-up.
 
 Hanging up on the phone immediately stops generation and playback. Interrupting a reply keeps the call connected. When the AI hangs up through MCP, the phone waits for already received replies to finish playing; playback failure also ends the call. Received content is preserved, with interruption reasons recorded where applicable.
+
+If an upgraded or restored configuration has no sharing permission yet, review each required service in its connection settings before calling. Existing permissions survive normal app updates but are not included in configuration backups.
 
 ### Connector and included adapters
 

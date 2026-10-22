@@ -453,6 +453,12 @@ export function createSQLiteStore(config={},databasePath=defaultDatabasePath) {
     async removePushDevice(owner,device){
       run('DELETE FROM tincall_devices WHERE owner_id=? AND id=? AND binding_id=?',owner,device.device_id,device.binding_id);return {};
     },
+    async resolveCallContext(owner,contact,prefix){
+      if(!/^[0-9a-f]{12}$/.test(prefix))throw new ConnectorError('invalid_call_context');
+      const rows=all("SELECT id FROM tincall_calls WHERE owner_id=? AND (? IS NULL OR contact_id=?) AND substr(replace(id,'-',''),1,12)=? LIMIT 2",owner.toLowerCase(),contact,contact,prefix);
+      if(rows.length!==1)throw new ConnectorError('call_context_not_found',409);
+      return {call_id:rows[0].id};
+    },
     async oauthCommand(action,p={}){return transaction(()=>{
       const after=seconds=>new Date(Date.now()+seconds*1000).toISOString();
       if(action==='client.create'){
@@ -460,8 +466,15 @@ export function createSQLiteStore(config={},databasePath=defaultDatabasePath) {
         run('DELETE FROM tincall_oauth_grants WHERE refresh_expires_at<=?',now());
         run(`DELETE FROM tincall_oauth_clients WHERE created_at<?
           AND NOT EXISTS(SELECT 1 FROM tincall_oauth_requests r WHERE r.client_id=tincall_oauth_clients.client_id)
-          AND NOT EXISTS(SELECT 1 FROM tincall_oauth_grants g WHERE g.client_id=tincall_oauth_clients.client_id)`,after(-86400));
+          AND NOT EXISTS(SELECT 1 FROM tincall_oauth_grants g WHERE g.client_id=tincall_oauth_clients.client_id)`,after(-600));
         if(get('SELECT count(*) n FROM tincall_oauth_clients WHERE created_at>?',after(-60)).n>=20)throw new ConnectorError('oauth_limit',429);
+        if(get('SELECT count(*) n FROM tincall_oauth_clients').n>=1000) {
+          run(`DELETE FROM tincall_oauth_clients WHERE client_id IN (
+            SELECT c.client_id FROM tincall_oauth_clients c WHERE c.created_at<?
+              AND NOT EXISTS(SELECT 1 FROM tincall_oauth_requests r WHERE r.client_id=c.client_id)
+              AND NOT EXISTS(SELECT 1 FROM tincall_oauth_grants g WHERE g.client_id=c.client_id)
+            ORDER BY c.created_at,c.client_id LIMIT 1)`,after(-60));
+        }
         if(get('SELECT count(*) n FROM tincall_oauth_clients').n>=1000)throw new ConnectorError('oauth_limit',429);
         insert('oauth_clients',{client_id:p.client_id,client_name:p.client_name,redirect_uris:json(p.redirect_uris),created_at:now()});return {};
       }

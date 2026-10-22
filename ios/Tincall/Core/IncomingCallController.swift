@@ -73,6 +73,7 @@ final class IncomingCallController: NSObject, @preconcurrency PKPushRegistryDele
 
     @ObservationIgnored var onResolveRole: ((String, CallMode, UUID) -> CallRole?)?
     @ObservationIgnored var canAcceptCall: (() -> Bool)?
+    @ObservationIgnored var canUseConnections: ((CallRole, ConnectionProfile) -> Bool)?
     @ObservationIgnored var onValidateCallAccess: (() async throws -> Void)?
     @ObservationIgnored var onRing: ((UUID, CallRole, ConnectionProfile) throws -> Void)?
     @ObservationIgnored var onIncoming: ((UUID, CallRole) -> Void)?
@@ -153,6 +154,9 @@ final class IncomingCallController: NSObject, @preconcurrency PKPushRegistryDele
         self.provider.setDelegate(self, queue: .main)
         observer.setDelegate(self, queue: .main)
         environment = settings.environment
+        for binding in settings.bindings {
+            if let connection = binding.connection { DataSharingConsent.rememberDeviceBinding(connection, defaults: defaults) }
+        }
     }
 
     var isEnabled: Bool { settings.enabled }
@@ -514,7 +518,8 @@ final class IncomingCallController: NSObject, @preconcurrency PKPushRegistryDele
 
     private func reportIncoming(callID: UUID, role: CallRole?, connection: ConnectionProfile?,
                                 allowed: Bool, completion: @escaping () -> Void) {
-        let mayAccept = allowed && connection != nil && role != nil && (canAcceptCall?() ?? false)
+        let connectionsAllowed = role.flatMap { role in connection.map { canUseConnections?(role, $0) ?? true } } ?? false
+        let mayAccept = allowed && connection != nil && role != nil && connectionsAllowed && (canAcceptCall?() ?? false)
         let update = Self.callUpdate(for: role)
         let handleType: String
         switch update.remoteHandle?.type {
@@ -545,7 +550,9 @@ final class IncomingCallController: NSObject, @preconcurrency PKPushRegistryDele
                     self.invitations.removeValue(forKey: callID)
                     if let connection { await self.onEnd?(callID, role, connection) }
                     if let error { self.report(error) }
-                    else { self.errorMessage = String(localized: "来电联系人未绑定或当前无法接听，已结束系统来电") }
+                    else if role != nil && connection != nil && !connectionsAllowed {
+                        self.errorMessage = String(localized: "此来电所需连接尚未授权，请打开 App 确认数据发送授权。")
+                    } else { self.errorMessage = String(localized: "来电联系人未绑定或当前无法接听，已结束系统来电") }
                 } else {
                     do { try await self.onValidateCallAccess?() }
                     catch {

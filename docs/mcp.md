@@ -10,14 +10,14 @@
 | --- | --- | --- |
 | `tincall_call` | 联系人凭据下无参数；其他身份按定义传 `contact_id` | 发起来电并等待接听，接通后提示可回复；单次等待最多 120 秒，未接听可继续 wait。重复拨号复用同联系人的未结束 MCP 通话 |
 | `tincall_get_call` | 可选 `call_id`、`limit`、`before_sequence` | 读取当前／指定通话的状态、文字和图片；结束通话可含已有摘要，历史默认 50 条、最多 100 条，按结果指引翻页 |
-| `tincall_wait` | 无参数 | 等待新消息、接听或挂断；超时返回提示继续等待，整通电话不受单次两分钟限制 |
-| `tincall_reply` | 必填 `text`；可选 `wait_for_input`，默认 true | 一次提交完整非空回复，默认继续等待下一句话；false 时返回“已发送。”，不代表已播完 |
-| `tincall_end` | 无参数 | 结束服务端通话，要求手机播放完已收到回复后挂断；手机手动挂断仍立即停止 |
+| `tincall_wait` | 可选 `call`；省略时发现当前通话 | 等待新消息、接听或挂断；已取得标记后沿用它继续等待，整通电话不受单次两分钟限制 |
+| `tincall_reply` | 必填 `call`、`text`；可选 `wait_for_input`，默认 true | 一次提交完整非空回复，默认继续等待下一句话；false 时返回“已发送。”，不代表已播完 |
+| `tincall_end` | 必填 `call` | 结束标记对应的原通话，要求手机播放完已收到回复后挂断；手机手动挂断仍立即停止 |
 | `tincall_list_calls` | 可选 `limit`、`before` | 列出当前身份的历史通话，默认 10 条、最多 50 条；用返回的翻页信息继续，再用 get_call 读正文 |
 
-参数以实际 `tools/list` 为准。接通、发言与结束结果面向模型直接呈现；图片返回标准 MCP image content，应读取实际内容。服务端的内部路由标识不要求模型抄写。
+参数以实际 `tools/list` 为准。接通、发言与等待结果提供一行 `call: XXXXXXXX`；模型只需原样带回这个 8 字符标记，不抄写 UUID、轮次或游标。服务端在当前身份范围内映射原通话；标记未知、有歧义或原通话已经结束时拒绝操作，不改选新通话。图片返回标准 MCP image content，应读取实际内容。
 
-正常通话：`call → reply({text}) → reply({text}) → …`。手机已拨出时，可用 `get_call` 确认状态或 `wait` 等待输入。告别：`reply({text, wait_for_input:false}) → end()`。
+正常通话：`call → reply({call, text}) → reply({call, text}) → …`，其中 `call` 是同一通电话返回的短标记。手机已拨出时，可用 `get_call` 确认状态或 `wait` 等待输入。告别：`reply({call, text, wait_for_input:false}) → end({call})`。更新现有服务时应用新增迁移与函数，并在平台刷新工具定义或重新连接；不要换用新标记重试旧任务。
 
 ## 等待、播放与失败
 
@@ -33,6 +33,10 @@
 平台接入程序在模型任务之外订阅 `/wake/events`，读取 `/wake/input`，把用户名、正文、实际图片与首次朗读要求带入平台会话，再启动一次 AI 任务。可以使用 [wake-adapter.mjs](../connector/wake-adapter.mjs)，运行与配置见 [连接端说明](../connector/README.md#唤醒桥接入)。
 
 专用 MCP 不列出 `tincall_wait`；`tincall_reply({text})` 发送完整回复后立即返回，AI 随后结束任务。接入程序串行处理同联系人任务，新输入排队；主动拨号等待接听的任务继续负责开场，不再重复启动开场任务。普通 MCP 配置本身不会创建这条订阅／启动链路。
+
+适配器将取到的 `input.call.id` 固定在任务专用 MCP 配置的 `Tincall-Call-ID` 请求头，不把路由标识交给模型；AI 不填写 `call`。新通话到来时停止旧任务。失败重试前重读并核对原目标，最多三次尝试、整个任务最多三分钟；达到上限后等待新输入，不无限重启旧任务。自建适配器也须传递同样的固定请求头。
+
+若自建适配器要启动主动拨号任务，先在适配器内部生成新通话 UUID 并设置此请求头，再调用 `tincall_call`；服务端按该编号创建通话，后续回复继续使用同一请求头。不要把上一通已结束的编号复用为新拨号任务。
 
 唤醒 SSE、普通 MCP 的 Streamable HTTP／旧 SSE 传输，都不意味着模型正在逐字发送回复。MCP 目前提交完整消息；HTTP 后端支持增量流式和完整回复。
 

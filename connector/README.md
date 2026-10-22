@@ -15,7 +15,7 @@
 
 本地安装器／Docker 默认只启动通用连接端，以及选择启用的隧道；不会自动运行唤醒适配器、Codex 适配器或 APNs 发送端。Supabase 一键部署也不安装本机进程或提供 AI 模型。两个适配器用途不同，不要求同时部署。
 
-后端 HTTP 生成支持 NDJSON 增量流与完整 JSON；普通 MCP／唤醒桥目前通过 `tincall_reply({text})` 发送完整消息。手机到连接端的通话事件使用长轮询，来电／唤醒通知使用 SSE，这些传输方式不能直接用来判断模型回复是否流式。
+后端 HTTP 生成支持 NDJSON 增量流与完整 JSON；MCP 目前提交完整消息。普通 MCP 回复带回一个 8 字符 `call` 标记；唤醒桥由适配器隐藏绑定，AI 只传 `text`。手机到连接端的通话事件使用长轮询，来电／唤醒通知使用 SSE，这些传输方式不能直接用来判断模型回复是否流式。
 
 使用说明按部署方式见下文；当前代码契约见 [后端接口](../docs/backend_api.md) 和 [MCP 工具](../docs/mcp.md)。每个部署需分别验证连接、真实生成、取消、手机播放与可选推送。
 
@@ -273,12 +273,12 @@ ordinary MCP connection alone does not install this workflow.
 **AI 启动命令的输入与配置约定：**
 
 - 标准输入只包含 `messages`（用户名和正文）、实际图片 `content`，以及接通时的简短提示；`voice_instructions` 仅在通话开始时提供一次。平台启动脚本应续接同一会话，保留人设和已收到的通话要求。
-- 专用 MCP 设置通过环境变量传给启动命令：`TINCALL_MCP_URL`、`TINCALL_MCP_TRANSPORT`、`TINCALL_MCP_HEADERS`（JSON 对象）。由你的启动脚本将它们映射到该平台的 MCP 设置，或在平台的私密集成设置中填入 App 复制的相同 URL 和 Authorization。凭据不要放进模型提示词、命令行参数或日志。HTTP MCP 的每个请求须带 `Accept: application/json, text/event-stream`；SSE 配置由支持该传输的平台处理。
+- 专用 MCP 设置通过环境变量传给启动命令：`TINCALL_MCP_URL`、`TINCALL_MCP_TRANSPORT`、`TINCALL_MCP_HEADERS`（JSON 对象）。由你的启动脚本将它们完整映射到本次任务的平台 MCP 设置；请求头包含凭据和自动绑定原通话的 `Tincall-Call-ID`，不能只复制固定的 Authorization，也不能在旧任务里换成新通话。凭据和路由标识不要放进模型提示词、命令行参数或日志。HTTP MCP 的每个请求须带 `Accept: application/json, text/event-stream`；SSE 配置由支持该传输的平台处理。
 - 把发言和实际图片交给模型。AI 用 `tincall_reply({"text":"完整回复"})` 说话，然后结束本次任务；不需要回复编号、轮次或游标。首次收到的 `voice_instructions` 应随平台会话保留。
-- 命令必须在该 AI 任务结束后退出，正常完成返回退出码 0；不能只把任务丢到后台就退出。接入程序会确认回复目标已完成或已被新一轮替代。失败或没有回复时按 1–30 秒退避重试；每次重读当前输入，不把旧文本换个目标重发。命令应处理 SIGTERM，并结束自己启动的 AI 子进程。单轮命令最多运行 3 分钟。
+- 命令必须在该 AI 任务结束后退出，正常完成返回退出码 0；不能只把任务丢到后台就退出。接入程序会确认回复目标已完成或已被新一轮替代。失败时重读并核对原目标，1 秒、2 秒后重试，最多三次尝试；整个任务含重试最多三分钟。目标失效或新通话到来时释放旧任务，不把旧文本换个目标重发。命令应处理 SIGTERM，并结束自己启动的 AI 子进程。
 - 启动命令的标准输出不会被当作通话回复，也不会输出到接入程序日志；标准错误同样不转储，避免泄漏消息和凭据。平台启动失败时需检查你配置的命令及平台自身的诊断，不要让其日志包含私人输入。
 
-**已经由接入程序处理的部分：** SSE 断开重连，401／403 停止；同一联系人串行启动、合并重复唤醒；读取新增输入和实际媒体；后续输入排队，当前 AI 写完后照常提交完整回复；失败任务保留已取输入重试，空闲时不轮询。机器标识只用于适配器内部处理，不交给 AI。
+**已经由接入程序处理的部分：** SSE 断开重连，401／403 停止；同一联系人串行启动、合并重复唤醒；读取新增输入和实际媒体；同一通话的后续输入排队，当前 AI 写完后照常提交完整回复；失败任务只在原目标仍有效时有限重试，空闲时不轮询。机器标识只用于适配器内部处理，不交给 AI。
 
 默认处理 `answered`（接通后开场）和 `input`（每轮说话／文字）。只想说话后唤醒时，在 `--` 前加 `--input-only`：
 
@@ -304,7 +304,7 @@ The owner uses `GET /wake/contacts` and `POST /wake/config` with
 `input:{transport:"http",url,headers}`, `mcp:{transport:"streamable-http",url,headers}`,
 and integration instructions. The input URL is `/wake/input`; the dedicated AI
 MCP URL is `/mcp/wake`. After updating an existing service, copy the configuration
-again; no credential reset or database migration is needed for this change.
+again, apply all current migrations and update both the function and adapter.
 The `tcwake_` credential is scoped to this contact's wake stream and MCP tools;
 it cannot manage the service, access backups or other contacts. It is distinct
 from both the phone token and ordinary MCP credentials. Configuration responses
@@ -343,8 +343,12 @@ Streams rotate after 120 seconds. Reconnect on EOF or a stream error with
 Subscribe-before-snapshot recovers the current unanswered
 target on every connection, even when a client sends Last-Event-ID; completed
 targets are not replayed. Delivery is at least once. Coalesce in-flight duplicate
-`event_id` values, but retry failed tasks until the reply is accepted. Serialize
-tasks per contact; queue subsequent input while the current task completes its reply. Resetting a
+`event_id` values. Before retrying, reread input and verify the original call and reply
+target. Make at most three command attempts within a three-minute total deadline;
+retire exhausted tasks until new input arrives. Pass the original `input.call.id` in
+the task-specific `Tincall-Call-ID` MCP request header, never in the AI prompt.
+Serialize tasks per contact; queue subsequent input in the same call while the
+current task completes its reply, and cancel an old task when a new call arrives. Resetting a
 credential rejects subsequent connections/tool requests and stops an old stream
 on its next wake; switching away from MCP also disables bridge authentication.
 Ordinary MCP credentials are unaffected by a bridge reset.
@@ -411,17 +415,21 @@ voice instructions, so the AI can speak immediately. A timeout says whether the
 phone has not answered or the person has not spoken, and directs the AI to
 `tincall_wait`.
 
-For a contact-scoped credential, call, wait and end need no arguments. A reply
-requires only `{"text":"完整回复"}`. This is a complete message, not a streaming
-fragment. Interrupting current phone playback does not invalidate the next
-submitted message. The service handles call selection, authorization, internal
-message identity and durable progress. The model does not supply UUIDs, reply
-references, epochs or cursors. A repeated dial reuses the unfinished call.
+For a contact-scoped credential, dialing needs no arguments. Ordinary MCP replies
+use `{"call":"XXXXXXXX","text":"完整回复"}`, copying the 8-character marker
+returned with that task's input. Use the same marker for end and subsequent waits;
+omit it from wait only to discover a new call. Never replace an old task's marker
+with a newer call. The service resolves it within the authenticated owner/contact,
+rejects unknown or ambiguous references, and refuses mutations on ended calls.
+The model does not supply UUIDs, reply IDs, epochs or cursors. Bridge tasks still
+submit text only: their adapter supplies the fixed `Tincall-Call-ID` request header.
+Refresh tool definitions after applying the current migrations and function update.
+A repeated dial reuses the unfinished call.
 
 Ordinary tool results contain readable text and actual images, without duplicate
 `structuredContent`. User messages use the profile name sent by the phone, for
 example `小白：` followed by the message. They do not add receipt announcements
-or routing metadata. Voice requirements are delivered once at call start,
+or per-turn routing metadata; one short `call` marker identifies the call. Voice requirements are delivered once at call start,
 including when using the wake bridge. Wait reads new messages and drains pages
 internally; later waits do not repeat delivered messages. History recovery is an
 explicit `tincall_get_call` operation, with older-page links when needed.

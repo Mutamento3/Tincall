@@ -12,7 +12,7 @@ import time
 transactions = Path(sys.argv[1])
 container = "tincall-deployment-sql-check"
 versions = ["202610110001", "202610110002", "202610140001", "202610160001",
-            "202610180001", "202610190001", "202610190002", "202610200001", "202610200002", "202610200003", "202610200004", "202610200005", "202610200006", "202610210001", "202610210002", "202610210003", "202610220001"]
+            "202610180001", "202610190001", "202610190002", "202610200001", "202610200002", "202610200003", "202610200004", "202610200005", "202610200006", "202610210001", "202610210002", "202610210003", "202610220001", "202610220002"]
 
 
 def sql(source, succeeds=True):
@@ -73,6 +73,12 @@ try:
     assert sql("select has_function_privilege('authenticated','public.tincall_command(text,jsonb,uuid)','execute');") == "f"
     assert sql("select has_function_privilege('service_role','public.tincall_command(text,jsonb,uuid)','execute');") == "t"
     assert sql("select has_table_privilege('authenticated','public.tincall_calls','select');") == "f"
+    footprint = (transactions / "footprint.sql").read_text().strip().rstrip(";")
+    assert sql("select exposed_tables from (" + footprint + ") f;") == "f"
+    sql("grant select on public.tincall_calls to anon;")
+    assert sql("select exposed_tables from (" + footprint + ") f;") == "t"
+    sql("revoke select on public.tincall_calls from anon;")
+    print("PASS: production deployment inspection detects restored table grants while RLS remains enabled")
     print("PASS: real seven-migration installation upgrades through the current migration, retries safely, and preserves the saved schedule")
     assert sql("select count(*) from storage.buckets where id='tincall-private' and not public;") == "1"
     assert sql("select count(*) from pg_policies where schemaname='storage' and tablename='objects' and policyname like 'tincall_media_%';") == "0"

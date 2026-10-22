@@ -48,6 +48,58 @@ test('pagination recovers a changed epoch, deduplicates messages and carries act
   assert.equal(input.reply.reply_to, '1.target');
 });
 
+test('a failed old task rechecks input and releases its slot for a new call', {timeout:6000}, async()=>{
+  const abort=new AbortController(),reads=[],logs=[];
+  const a=crypto.randomUUID(),b=crypto.randomUUID();let current=a,output,starts=0;
+  const config={version:2,contact_id:'linked',wake:{transport:'sse',url:'https://fixture.invalid/wake/events',headers:{Authorization:'Bearer fixture'}},
+    input:{transport:'http',url:'https://fixture.invalid/wake/input',headers:{Authorization:'Bearer fixture'}},
+    mcp:{transport:'streamable-http',url:'https://fixture.invalid/mcp/wake',headers:{Authorization:'Bearer fixture'}}};
+  const event=id=>`event: wake\ndata: ${JSON.stringify({contact_id:'linked',event_id:id,reply_to:id,call_id:id,reason:'input'})}\n\n`;
+  const fetcher=async (url,init)=>{
+    if(String(url).endsWith('/events'))return new Response(new ReadableStream({start(controller){
+      output=controller;controller.enqueue(new TextEncoder().encode(event(a)));
+      init.signal.addEventListener('abort',()=>controller.close(),{once:true});
+    }}),{headers:{'Content-Type':'text/event-stream'}});
+    reads.push(current);
+    return Response.json({structuredContent:{event:'input',call:{id:current,epoch:1},reply:{kind:'input',reply_to:current,reply_id:current},
+      messages:[{id:current,role:'user',text:'Synthetic input'}],cursor:{epoch:1,sequence:1},has_more:false},content:[]});
+  };
+  const timer=setTimeout(()=>abort.abort(),4500);
+  try {
+    await runWakeAdapter({config,command:[process.execPath,'-e','process.exit(1)'],signal:abort.signal,fetcher,log:line=>{
+      logs.push(line);
+      if(line==='Input ready; starting AI task.' && ++starts===2)abort.abort();
+      if(line.includes('attempt failed') && current===a){current=b;output.enqueue(new TextEncoder().encode(event(b)));}
+    }});
+    assert.equal(starts,2);
+    assert.ok(reads.includes(b),'the queued new call must be reread before launching another task');
+  } finally {clearTimeout(timer);abort.abort();}
+});
+
+test('a persistently failing AI task stops after three attempts', {timeout:7000}, async()=>{
+  const abort=new AbortController(),id=crypto.randomUUID();let starts=0,limited=false;
+  const config={version:2,contact_id:'linked',wake:{transport:'sse',url:'https://fixture.invalid/events',headers:{Authorization:'Bearer fixture'}},
+    input:{transport:'http',url:'https://fixture.invalid/input',headers:{Authorization:'Bearer fixture'}},
+    mcp:{transport:'streamable-http',url:'https://fixture.invalid/mcp/wake',headers:{Authorization:'Bearer fixture'}}};
+  const fetcher=async(url,init)=>{
+    if(String(url).endsWith('/events'))return new Response(new ReadableStream({start(controller){
+      controller.enqueue(new TextEncoder().encode(`event: wake\ndata: ${JSON.stringify({contact_id:'linked',event_id:id,reply_to:id,call_id:id,reason:'input'})}\n\n`));
+      init.signal.addEventListener('abort',()=>controller.close(),{once:true});
+    }}),{headers:{'Content-Type':'text/event-stream'}});
+    return Response.json({structuredContent:{event:'input',call:{id,epoch:1},reply:{kind:'input',reply_to:id,reply_id:id},
+      messages:[{id,role:'user',text:'Synthetic input'}],cursor:{epoch:1,sequence:1},has_more:false},content:[]});
+  };
+  const timer=setTimeout(()=>abort.abort(),6000);
+  try {
+    await runWakeAdapter({config,command:[process.execPath,'-e','process.exit(1)'],signal:abort.signal,fetcher,log:line=>{
+      if(line==='Input ready; starting AI task.')starts++;
+      if(line.includes('retry limit reached')){limited=true;abort.abort();}
+    }});
+    assert.equal(limited,true,'the retry loop must terminate without waiting for another event');
+    assert.equal(starts,3);
+  } finally {clearTimeout(timer);abort.abort();}
+});
+
 test('adapter starts commands after pagination, retries, coalesces reconnects, queues later input and stops on revoked credentials', {timeout: 15000}, async () => {
   const directory = await mkdtemp(join(tmpdir(), 'tincall-adapter-'));
   const owner = crypto.randomUUID(), abort = new AbortController();
@@ -114,6 +166,7 @@ test('adapter starts commands after pagination, retries, coalesces reconnects, q
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
       const headers = {...JSON.parse(process.env.TINCALL_MCP_HEADERS), 'Content-Type':'application/json', Accept:'application/json, text/event-stream'};
+      if (!headers['Tincall-Call-ID']) process.exit(3);
       const response = await fetch(url, {method:'POST', headers, body:JSON.stringify({jsonrpc:'2.0', id:1, method:'tools/call', params:{name:'tincall_reply', arguments:{text:'Synthetic fixture reply'}}})});
       const result = await response.json();
       if (result.result?.isError !== false) process.exit(2);

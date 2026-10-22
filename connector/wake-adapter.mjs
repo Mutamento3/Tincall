@@ -106,7 +106,7 @@ export function runAICommand(command, config, input, signal) {
       env: {...process.env,
         TINCALL_MCP_URL: config.mcp.url,
         TINCALL_MCP_TRANSPORT: config.mcp.transport,
-        TINCALL_MCP_HEADERS: JSON.stringify(config.mcp.headers),
+        TINCALL_MCP_HEADERS: JSON.stringify({...config.mcp.headers,'Tincall-Call-ID':input.call.id}),
       },
     });
     let timer, spawnError;
@@ -157,49 +157,74 @@ export async function runWakeAdapter({config, command, signal, inputOnly = false
   let pending, active, worker, fatal;
   const fail = error => { fatal = error; lifetime.abort(); active?.controller.abort(); };
   const remember = new Set();
+  const retire=reference=>{
+    remember.add(reference);
+    if(remember.size>256)remember.delete(remember.values().next().value);
+  };
   const notify = event => {
     if (event.contact_id !== config.contact_id || !event.reply_to || !event.event_id
       || !['answered', 'input'].includes(event.reason) || (inputOnly && event.reason !== 'input')) return;
     if (remember.has(event.reply_to) || pending?.reply_to === event.reply_to || active?.reply_to === event.reply_to) return;
     pending = event;
+    if(active?.call_id && event.call_id && active.call_id!==event.call_id)active.controller.abort();
     if (!worker) worker = work().catch(fail).finally(() => { worker = undefined; });
   };
   async function work() {
     while (pending && !stopped.aborted) {
       const event = pending; pending = undefined;
       const controller = new AbortController();
-      active = {reply_to: event.reply_to, controller};
-      const taskSignal = AbortSignal.any([stopped, controller.signal]);
-      let retryMs = 1000, input = event.input;
+      const deadline=AbortSignal.timeout(180000);
+      active = {reply_to: event.reply_to, call_id:event.call_id, controller};
+      // Bound the entire task, including retries, rather than each command alone.
+      const taskSignal = AbortSignal.any([stopped, controller.signal,deadline]);
+      let retryMs = 1000, attempts=0, input = event.input;
       try {
         while (!taskSignal.aborted) {
           try {
-            input ??= await readWakeInput(config, taskSignal, fetcher);
+            const latest=await readWakeInput(config, taskSignal, fetcher);
+            if(input && (!latest || input.call.id!==latest.call.id || input.reply.reply_to!==latest.reply.reply_to)) {
+              if(latest)pending={contact_id:config.contact_id,call_id:latest.call.id,event_id:latest.reply.reply_id,
+                reply_to:latest.reply.reply_to,reason:latest.reply.kind==='opening'?'answered':'input',input:latest};
+              break;
+            }
+            input??=latest;
             if (!input || (inputOnly && input.reply.kind === 'opening')) break;
+            active.call_id=input.call.id;
             active.reply_to = input.reply.reply_to;
             if (remember.has(active.reply_to)) break;
+            attempts++;
             log('Input ready; starting AI task.');
             // A stuck platform task cannot permanently block later work.
-            await runAICommand(command, config, input, AbortSignal.any([taskSignal, AbortSignal.timeout(180000)]));
+            await runAICommand(command, config, input, taskSignal);
             const after = await readWakeInput(config, taskSignal, fetcher);
             if (after?.reply.reply_to === input.reply.reply_to) throw new Error('AI exited without an accepted reply');
-            remember.add(input.reply.reply_to);
-            if (remember.size > 256) remember.delete(remember.values().next().value);
+            retire(input.reply.reply_to);
             log('AI task finished.');
             // Keep later input queued while the current complete reply is submitted.
-            if (after) pending={contact_id: config.contact_id, event_id: after.reply.reply_id,
+            if (after) pending={contact_id: config.contact_id, call_id:after.call.id,event_id: after.reply.reply_id,
               reply_to: after.reply.reply_to, reason: after.reply.kind === 'opening' ? 'answered' : 'input',input:after};
             break;
           } catch (error) {
             if (error instanceof StopError) throw error;
             if (taskSignal.aborted) break;
+            if(attempts>=3) {
+              retire(active.reply_to);
+              log('AI task retry limit reached; waiting for a new input.');
+              break;
+            }
             log('AI/input attempt failed; retrying pending work. Check the AI command and its MCP setup.');
             await delay(retryMs, undefined, {signal: taskSignal});
             retryMs = Math.min(retryMs * 2, 30000);
           }
         }
       } catch (error) { if (!taskSignal.aborted) throw error; }
-      finally { active = undefined; }
+      finally {
+        if(deadline.aborted && !stopped.aborted) {
+          retire(active.reply_to);
+          log('AI task time limit reached; waiting for a new input.');
+        }
+        active = undefined;
+      }
     }
   }
   let reconnectMs = 1000;

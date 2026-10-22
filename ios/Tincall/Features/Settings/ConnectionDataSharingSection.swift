@@ -17,6 +17,10 @@ struct ConnectionDataSharingSection: View {
                     allowed = DataSharingConsent.isAllowed(connection)
                 }))
                 .disabled(!DataSharingConsent.canAuthorize(connection))
+                if connection.provider == .genericConnector {
+                    Text("关闭授权后，仍可向原服务发送设备解绑请求，以停用后台来电。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
                 Link("隐私政策", destination: DataSharingConsent.privacyURL)
             } header: { SettingsSectionHeading(title: String(localized: "数据发送授权"), caption: "PRIVACY") }
             .onAppear { allowed = DataSharingConsent.isAllowed(connection) }

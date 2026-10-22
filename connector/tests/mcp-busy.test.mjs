@@ -5,6 +5,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createSQLiteStore} from '../sqlite-store.mjs';
 import {createConnector} from '../../supabase/functions/_shared/tincall/service.mjs';
+import {callReference} from '../../supabase/functions/_shared/tincall/mcp.mjs';
 
 test('MCP explains an owner-wide busy slot without disclosing another contact or ending its call',async()=>{
   const directory=mkdtempSync(join(tmpdir(),'tincall-busy-'));
@@ -106,14 +107,14 @@ test('MCP default wait lasts two minutes and exposes no caller-managed reply ide
   const tool=(name,args={})=>rpc('tools/call',{name,arguments:args});
   try {
     const definitions=(await rpc('tools/list')).tools;
-    assert.deepEqual(definitions.find(tool=>tool.name==='tincall_reply').inputSchema.required,['text']);
+    assert.deepEqual(definitions.find(tool=>tool.name==='tincall_reply').inputSchema.required,['call','text']);
     for(const name of ['tincall_call','tincall_wait','tincall_reply','tincall_end'])for(const key of ['reply_to','sequence','epoch','call_id','request_id','timeout_seconds'])assert.equal(definitions.find(tool=>tool.name===name).inputSchema.properties[key],undefined);
     const id=crypto.randomUUID();await store.command(owner,'call.create',{request_id:id,call_id:id,contact_id:'visible',source:'mcp'});
     await tool('tincall_wait',{timeout_seconds:1});
     context.mock.method(Date,'now',()=>clock);advance=true;
     const timeout=await tool('tincall_wait');advance=false;
     assert.equal(snapshots,2);assert.match(timeout.content[0].text,/tincall_wait/);assert.doesNotMatch(timeout.content[0].text,/get_call|cursor|epoch/);
-    assert.equal((await tool('tincall_reply',{text:'Complete text',wait_for_input:false})).isError,false);
-    await tool('tincall_end');
+    assert.equal((await tool('tincall_reply',{call:callReference(id),text:'Complete text',wait_for_input:false})).isError,false);
+    await tool('tincall_end',{call:callReference(id)});
   } finally {context.mock.restoreAll();store.close();rmSync(directory,{recursive:true,force:true});}
 });

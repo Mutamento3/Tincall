@@ -69,6 +69,10 @@ final class TincallRuntime {
             incoming.canAcceptCall = { [weak coordinator, access] in
                 coordinator?.isCallActive == false && (access.state == .checking || access.canCall)
             }
+            incoming.canUseConnections = { role, connector in
+                DataSharingConsent.permitsIncomingCall(role: role, connector: connector, connections: configuration.connections,
+                                                      defaultSTT: configuration.defaultSTTConnectionID)
+            }
             incoming.onValidateCallAccess = { [access] in try await access.requireAccess() }
             incoming.onResolveRole = { identifier, mode, connectionID in
                 return configuration.roles.first { role in
