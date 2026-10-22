@@ -15,7 +15,7 @@ Tincall requires an iPhone running iOS 26 or later. The source edition does not 
 
 ## Install a self-signing IPA
 
-If the official Releases page provides an IPA explicitly intended for personal self-signing, download and re-sign it using your own signing method. An IPA does not authorize arbitrary devices to install it. Re-signing normally avoids recompiling, but the signing tool must correctly handle:
+Download `*-selfsign-unsigned.ipa` from Assets on the [latest release page](https://github.com/chuli1122/Tincall/releases/latest), then re-sign and install it using your own signing method. An IPA does not authorize arbitrary devices to install it. Re-signing normally avoids recompiling, but the signing tool must correctly handle:
 
 - The main app, embedded frameworks and Live Activity extension, with matching profiles and entitlements.
 - Unique bundle IDs. The extension ID must start with the main app ID followed by a dot, for example `com.yourname.tincall.CallWidget`.

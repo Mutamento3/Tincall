@@ -1,10 +1,10 @@
 # Tincall 自签与安装
 
-可以从源码构建；如官方 [Releases](https://github.com/chuli1122/Tincall/releases) 提供供个人自签的 IPA，也可直接重签安装。两种方式都需要 iOS 26 或以上的 iPhone，以及适用的签名和设备权限。个人使用范围见 [许可](../LICENSE)。
+可以从 [最新发布页](https://github.com/chuli1122/Tincall/releases/latest) 下载 IPA 后自行重签安装，也可以从源码构建。两种方式都需要 iOS 26 或以上的 iPhone，以及适用的签名和设备权限。个人使用范围见 [许可](../LICENSE)。
 
 ## 使用官方 IPA
 
-下载发布页标明供个人自签的 IPA，使用自己的签名方式安装，可省去源码编译和 Xcode 构建。具体签名工具需要什么电脑或账号，以该工具说明为准；IPA 本身不让任意设备免签安装。
+在 [最新发布页](https://github.com/chuli1122/Tincall/releases/latest) 的 Assets 中下载 `*-selfsign-unsigned.ipa`，使用自己的签名方式重签安装，可省去源码编译和 Xcode 构建。具体签名工具需要什么电脑或账号，以该工具说明为准；IPA 本身不让任意设备免签安装。
 
 签名工具须正确处理主 App、实时活动扩展及其权限。App Group 和推送需要签名团队与描述文件支持，不能保证所有重签方式都保留这些功能。签名有效期到期后需要重新签名。
 

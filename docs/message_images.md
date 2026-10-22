@@ -49,23 +49,24 @@
 
 ## MCP 工具返回
 
-`tincall_inputs`、`tincall_record`、`tincall_wait_for_input`，以及 `tincall_reply` 完成回复后等待下一条输入的结果，均会附带标准 MCP 图片内容。第一个 `content` 保持原有 JSON 文字结果；`structuredContent` 保留同一结构和图片引用。随后按消息顺序、图片数组顺序，逐张返回关联说明和标准图片内容：
+标准 MCP 模式下，`tincall_get_call` 返回通话状态和已保存的消息；`tincall_wait` 等待下一条消息、接听或挂断事件；`tincall_reply` 发送完整回复，默认随后等待下一条输入。这些结果包含图片消息时，会在 `content` 中返回可读文字、图片组说明和标准 MCP 图片内容，不返回 `structuredContent` 或 JSON 消息快照。
+
+下面是包含一张图片的返回示例，实际文字还可能包含通话状态和操作提示：
 
 ```json
 {
   "content": [
-    {"type": "text", "text": "原有 JSON 结果，消息包含 images 引用"},
-    {"type": "text", "text": "{\"message_id\":\"消息 UUID\",\"image_id\":\"图片 UUID\",\"image_index\":0}"},
+    {"type": "text", "text": "用户（图片组 1）：\n请看这张图片。"},
+    {"type": "text", "text": "图片组 1 · 图片 1"},
     {"type": "image", "data": "完整标准 Base64", "mimeType": "image/jpeg"}
   ],
-  "structuredContent": {"call": {}, "messages": []},
   "isError": false
 }
 ```
 
-示例中的 `structuredContent` 仅示意外层位置；具体工具仍返回原有 `messages` 或 `input`／`job` 等字段。图片不塞入 JSON 文字伪装成可见图像。无图结果仍只有原来的文字内容。对面平台需要支持 MCP image content，并将其交给具备视觉能力的模型。
+图片组按本次返回中含图片消息的顺序编号，每组内再按图片数组顺序编号，文字中的组号与后续图片说明对应。无图结果不附带图片内容。对面平台需要支持 MCP image content，并将其交给具备视觉能力的模型。
 
-若回复已经提交、但随后读取下一条输入的图片失败，结果仍保留 `reply_accepted:true`，同时返回 `wait_error`、`input:null`、`job:null` 和可重新补取的 `after_sequence:0`；对面应继续等待补取，不重发已经接收的回复。
+图片成功读取后才会推进消息交付位置，读取失败可重试。若回复已经保存、但随后等待或读取下一条输入的图片失败，工具仍返回 `isError:false`，并明确提示“回复已保存，等待下一条消息失败”，要求调用 `tincall_wait` 继续等待；不要重发已保存的回复，也不要自行构造旧版游标参数。其他失败按实际错误提示处理，不能一律视为回复已保存。
 
 ## 后端直连请求
 

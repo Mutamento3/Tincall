@@ -29,7 +29,7 @@ Tincall 是最低支持 iOS 26 的原生 AI 语音通话 App。支持手机直�
 
 ### 开始使用
 
-1. **安装手机 App**：源码构建需要 Mac、Xcode 和 iOS 26 以上的 iPhone，按 [自签指南](docs/SELF_SIGN.md) 配置自己的团队、App／扩展标识及 App Group。如官方 [Releases](https://github.com/chuli1122/Tincall/releases) 提供供个人自签的 IPA，也可下载后自行重签安装，无需重新编译。签名凭据由使用者自行准备。
+1. **安装手机 App**：从 [最新发布页](https://github.com/chuli1122/Tincall/releases/latest) 下载 `*-selfsign-unsigned.ipa`，按 [自签指南](docs/SELF_SIGN.md) 使用自己的签名凭据重签安装，无需重新编译。需要 iOS 26 或以上的 iPhone，签名工具须正确配置 App／扩展标识及 App Group。也可使用 Mac 和 Xcode 从源码构建。
 2. **配置识别和声音**：在 App 配置 STT／TTS，选择供应商、型号和音色。TTS 的“语音表达提示词”有按型号区分的默认值，也可自行编辑。
 3. **配置联系人**：独立模式选模型并填写人物设定；MCP 按 [接入指引](docs/agent_prompt.md) 登记联系人并复制平台配置；后端按 [接口说明](docs/backend_api.md) 准备服务。
 4. **验证一通电话**：先确认服务和模型可达，再检查实际收音、回复、播放、打断和挂断。
@@ -150,7 +150,7 @@ Model, speech, and self-hosting costs depend on their respective providers; purc
 
 ### Get started
 
-1. **Install the iPhone app.** Building from source requires a Mac, Xcode, and an iPhone running iOS 26 or later. Follow the [signing guide](docs/SELF_SIGN.md) to configure your own team, app and extension identifiers, and App Group. If the official [Releases](https://github.com/chuli1122/Tincall/releases) provide an IPA for personal signing, you can re-sign and install it without rebuilding. You supply your own signing credentials.
+1. **Install the iPhone app.** Download `*-selfsign-unsigned.ipa` from the [latest release](https://github.com/chuli1122/Tincall/releases/latest) and follow the [signing guide](docs/SELF_SIGN.md) to re-sign and install it with your own signing credentials, without recompiling. You need an iPhone running iOS 26 or later, and a signing tool that correctly configures the app and extension identifiers and App Group. You can also build from source using a Mac and Xcode.
 2. **Configure recognition and speech.** Add STT and TTS settings in the app, including the provider, model, and voice. TTS expression prompts have model-specific defaults and can be edited.
 3. **Configure a contact.** In standalone mode, select a model and enter a persona. For MCP, register the contact and copy its platform configuration using the [integration guide](docs/agent_prompt.md). For backend mode, prepare your service using the [HTTP protocol documentation](docs/backend_api.md).
 4. **Test a complete call.** Check service and model availability, then verify audio capture, replies, playback, interruption, and hang-up.
