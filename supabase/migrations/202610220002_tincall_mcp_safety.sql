@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 -- Resolve a compact call reference within the authenticated owner/contact only.
 -- Ambiguous prefixes fail closed, including collisions with ended calls.
 create function public.tincall_resolve_call_context(p_owner uuid,p_contact text,p_prefix text) returns jsonb

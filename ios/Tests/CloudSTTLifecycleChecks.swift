@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 // Compile only with the two production cloud recognizers, their transcript parsers,
 // SpeechRecognizer.swift and Core/CallModels.swift. The microphone, sockets and log
 // sink below are test-only boundaries; no microphone, provider or user files are used.

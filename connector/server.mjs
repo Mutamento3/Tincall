@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 import {createServer} from 'node:http';
 import {Readable} from 'node:stream';
 import {configFromEnvironment, createConnector} from '../supabase/functions/_shared/tincall/service.mjs';

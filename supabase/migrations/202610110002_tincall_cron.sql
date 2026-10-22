@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 -- Project-owned scheduler. Store the URL and bearer in Supabase Vault after deployment.
 create extension if not exists pg_cron;
 create extension if not exists pg_net with schema extensions;

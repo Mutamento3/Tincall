@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 -- Only routing metadata reaches the private owner channel. The authenticated
 -- data service subscribes on behalf of its phone; no service key enters the App.
 create function public.tincall_broadcast_incoming() returns trigger

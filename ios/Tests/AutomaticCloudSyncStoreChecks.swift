@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 // Standalone Store regression checks. All fixtures below are test-only; no real transport or Keychain is used.
 // From the repository root:
 // xcrun swiftc -swift-version 6 -parse-as-library ios/Tincall/Core/CallModels.swift ios/Tincall/Storage/CallRecordStore.swift ios/Tincall/Storage/CloudSyncModels.swift ios/Tincall/Storage/CloudSyncStore.swift ios/Tincall/Storage/CloudRecordTransfer.swift ios/Tests/AutomaticCloudSyncStoreChecks.swift -o /tmp/tincall-auto-sync-store-checks

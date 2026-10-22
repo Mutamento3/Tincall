@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 -- Keep a saved MCP identity while its phone contact uses another call mode.
 alter table public.tincall_mcp_roles add column call_mode text not null default 'mcp'
   check (call_mode in ('standalone','mcp','backend'));

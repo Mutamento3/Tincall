@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 -- Continuous MCP retains instructions until a reply acknowledges them.
 -- A wake adapter starts a new AI task each turn and explicitly requests them again.
 create or replace function public.tincall_mcp(p_action text, p_owner uuid, p_contact text, p_payload jsonb default '{}')

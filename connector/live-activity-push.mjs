@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 // Shared by the Node and Cloudflare senders. Routing and delivery state are stored;
 // the display name is forwarded for this start only, never persisted here.
 export class ActivityPushError extends Error {

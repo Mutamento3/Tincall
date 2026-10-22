@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 // Isolated transport fixtures; the production controller owns subscriptions and cancellation.
 import Foundation
 import AVFAudio

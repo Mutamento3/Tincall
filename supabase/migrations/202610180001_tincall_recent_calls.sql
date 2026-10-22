@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 -- Only the connector may select an owner/contact scope; role credentials are
 -- authenticated and scoped by the shared HTTP/MCP service before this RPC.
 create function public.tincall_recent_calls(p_owner uuid, p_contact text default null, p_limit integer default 10)

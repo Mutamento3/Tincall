@@ -1,4 +1,7 @@
-import AVFoundation
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
+@preconcurrency import AVFoundation
 import Foundation
 import OSLog
 import UIKit
@@ -138,19 +141,20 @@ final class MicrophoneCapture {
         }
         // The tap runs on the realtime audio thread; it must not inherit MainActor isolation.
         nonisolated(unsafe) let tapConverter = converter
-        input.installTap(onBus: 0, bufferSize: 3200, format: nil) { @Sendable [weak self, weak engine] buffer, time in
+        nonisolated(unsafe) weak var captureEngine = engine
+        input.installTap(onBus: 0, bufferSize: 3200, format: nil) { @Sendable [weak self] buffer, time in
             do {
                 let pcm = try Self.convert(buffer, using: tapConverter, target: target)
-                Task { @MainActor [weak self, weak engine] in
-                    guard let self, let engine, self.engine === engine, !self.paused,
+                Task { @MainActor [weak self] in
+                    guard let self, let engine = captureEngine, self.engine === engine, !self.paused,
                           !time.isHostTimeValid || time.hostTime >= self.captureStartedAt else { return }
                     if case .dropped = self.continuation?.yield((pcm, self.generation)) {
                         await self.fail(TincallError(message: String(localized: "语音处理过慢，请重新打开麦克风")), generation: self.generation)
                     }
                 }
             } catch {
-                Task { @MainActor [weak self, weak engine] in
-                    guard let self, let engine, self.engine === engine else { return }
+                Task { @MainActor [weak self] in
+                    guard let self, let engine = captureEngine, self.engine === engine else { return }
                     await self.fail(error, generation: self.generation)
                 }
             }
@@ -160,15 +164,15 @@ final class MicrophoneCapture {
         do { try prepare("engine_start") { try engine.start() } } catch { stop(); throw error }
         logSession("capture_engine_started", session: session)
         recordPreparation("engine_started")
-        configurationObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self, weak engine] _ in
-            Task { @MainActor [weak self, weak engine] in
-                guard let self, let engine, self.engine === engine else { return }
+        configurationObserver = NotificationCenter.default.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, let engine = captureEngine, self.engine === engine else { return }
                 await self.refreshForCurrentRoute(event: .captureConfigurationRestart)
             }
         }
-        routeObserver = NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self, weak engine] _ in
-            Task { @MainActor [weak self, weak engine] in
-                guard let self, let engine, self.engine === engine else { return }
+        routeObserver = NotificationCenter.default.addObserver(forName: AVAudioSession.routeChangeNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, let engine = captureEngine, self.engine === engine else { return }
                 await self.refreshForCurrentRoute(event: .captureRouteRestart)
             }
         }

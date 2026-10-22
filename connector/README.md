@@ -133,6 +133,38 @@ sh connector/install-local.sh --stop
 
 **电脑必须一直开机且不能休眠。** 此安装提供连接端、备份、任务及 MCP 服务；平台真实的生成／取消入口、APNs 发送服务、Apple 凭据和设备绑定仍需分别配置。
 
+## Deploy on your own computer or server
+
+Install [Node.js LTS](https://nodejs.org/) with a working built-in `node:sqlite` (Node 22.5 or later; Node 24 recommended). Docker and npm dependencies are not required. From the repository root:
+
+```sh
+# macOS / Linux
+sh connector/install-local.sh
+```
+
+```powershell
+# Windows, no WSL required
+powershell -NoProfile -ExecutionPolicy Bypass -File connector\install-local.ps1
+```
+
+The installer creates or reuses the private phone token, worker token and owner UUID, then runs the connector in the background on `http://127.0.0.1:8787`. It does not install Node, Docker or cloudflared for you. Add `--docker` (Windows: `-Docker`) to use Docker instead. `--stop` (Windows: `-Stop`) stops the service and keeps tokens and data. After pulling new source, run the same command again to update.
+
+### Reach the connector from your phone and AI platform
+
+Tincall and AI platforms accept HTTPS addresses only. Choose one option below, then enter the HTTPS base URL and the phone token under **Connect to an existing service** in Tincall. The MCP URL is the base URL followed by `/mcp`.
+
+| Your setup | What to use | Phone | AI platform |
+|---|---|---|---|
+| Home computer, no other tools | Install cloudflared and add `--tunnel` (Windows: `-Tunnel`) | Yes | Yes |
+| Tailscale on computer and phone, personal use only | Run `tailscale serve --bg 8787` on the computer | Yes, with Tailscale on | No |
+| Tailscale, and the AI platform also needs access | Run `tailscale funnel --bg 8787` on the computer | Yes | Yes |
+| An ngrok account | Configure your authtoken, then run `ngrok http 8787` | Yes | Yes |
+| A server with a public address and domain | A reverse proxy such as Caddy forwarding to port 8787 | Yes | Yes |
+
+With Tailscale, enable MagicDNS and HTTPS certificates in the admin console first. Reverse proxies must allow idle requests of at least 120 seconds for MCP waits. Quick tunnel URLs can change after a restart; update the app and the MCP settings when they do. The computer must stay on and awake.
+
+Background service, log location and Docker volume details are in the Chinese section above.
+
 ## Choose Node storage (no Supabase account required)
 
 Node 24 is recommended (verified with v24.15.0). The installer also accepts Node 22.5+ after a SQLite availability probe; older versions need `--experimental-sqlite` as described above. SQLite uses the built-in `node:sqlite`, so neither npm packages nor native addons are needed. The connector uses the same production HTTP/MCP service with an injected SQLite store; the Supabase service and migrations are unchanged.
@@ -502,11 +534,11 @@ Run the same connector tests against both backends:
 
 ```sh
 export PATH="$HOME/.nvm/versions/node/v24.15.0/bin:/Applications/Docker.app/Contents/Resources/bin:$PATH"
-TINCALL_TEST_STORAGE=supabase node --test connector/tests/*.test.mjs
+TINCALL_TEST_STORAGE=postgres node --test connector/tests/*.test.mjs
 TINCALL_TEST_STORAGE=sqlite node --test connector/tests/*.test.mjs
 ```
 
-Supabase is the default test backend and needs Docker with `postgres:18-alpine`. SQLite runs use temporary local files; PostgreSQL-only RLS checks are replaced with owner/auth isolation checks there. The Supabase run retains the original SQL/RLS assertions. Additional SQLite tests cover schema upgrades with retained data, restart persistence, concurrent claims from independent processes, worker expiry, media and storage selection. Supabase tests execute the real SQL migrations, RLS policies and production HTTP/MCP service against isolated PostgreSQL, and drive the generation/cancellation adapter over localhost HTTP. All content is synthetic and the test container is removed afterward. Push tests exercise the production binding, deduplication, immediate redial and failure logic with a transport fixture; they do not contact Apple. Storage tests exercise the production streaming proxy against an HTTP protocol fixture; they do not upload to a real Supabase project.
+`TINCALL_TEST_STORAGE` accepts only `sqlite` or `postgres`; when unset, it defaults to `postgres`. Other values fail immediately. PostgreSQL needs Docker with `postgres:18-alpine`. SQLite runs use temporary local files; PostgreSQL-only RLS checks are replaced with owner/auth isolation checks there. The PostgreSQL run retains the original SQL/RLS assertions. Additional SQLite tests cover schema upgrades with retained data, restart persistence, concurrent claims from independent processes, worker expiry, media and storage selection. Supabase tests execute the real SQL migrations, RLS policies and production HTTP/MCP service against isolated PostgreSQL, and drive the generation/cancellation adapter over localhost HTTP. All content is synthetic and the test container is removed afterward. Push tests exercise the production binding, deduplication, immediate redial and failure logic with a transport fixture; they do not contact Apple. Storage tests exercise the production streaming proxy against an HTTP protocol fixture; they do not upload to a real Supabase project.
 
 The Cron extension migration requires a Supabase-compatible database. The App has a Supabase deployment/update flow; this connector module also supplies CLI installers. Neither flow provisions arbitrary AI platforms or automatically enrolls users into a publisher push account.
 

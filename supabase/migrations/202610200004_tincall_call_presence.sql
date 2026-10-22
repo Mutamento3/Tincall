@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 -- A phone already reads active-call events at least every 25 seconds. Reuse
 -- those reads as presence; MCP reads/replies and idle subscriptions do not
 -- renew this lease. A terminated/offline phone cannot hold the account forever.

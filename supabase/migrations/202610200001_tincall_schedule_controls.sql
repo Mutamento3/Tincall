@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 alter table public.tincall_schedules add column week_day smallint
   check (week_day is null or (week_day between 1 and 7 and daily_time is not null));
 

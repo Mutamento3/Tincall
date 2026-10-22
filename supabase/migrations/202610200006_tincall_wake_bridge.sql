@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 -- A bridge credential grants one contact's MCP tools and wake stream only.
 create table public.tincall_wake_bridges (
   owner_id uuid not null,

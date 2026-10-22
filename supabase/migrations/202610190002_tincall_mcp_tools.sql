@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 -- MCP facade: bounded reads, a real opening reply, and atomic append/finalize.
 -- Existing phone/HTTP commands keep their original contract.
 alter table public.tincall_messages add column reply_touched_at timestamptz;

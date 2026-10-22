@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 import {ConnectorError, ensure, requiredText, readJSON, MAX_BODY} from './protocol.mjs';
 import {getBinding, validateBinding} from './call-commands.mjs';
 

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 import Foundation
 import Security
 
@@ -178,6 +181,15 @@ private final class DeploymentProtocol: URLProtocol, @unchecked Sendable {
                     precondition(request.value(forHTTPHeaderField: "Authorization") == "Bearer \(f.clients[0]["token"]!)")
                     precondition(f.vault["tincall_worker_token"] == f.worker)
                     result = ["bindings": [], "owner_id": testOwner.uuidString]
+                } else if path == "/functions/v1/tincall/push/verify" {
+                    operation = "push.verify"
+                    precondition(request.httpMethod == "POST")
+                    precondition(body == Data("{}".utf8))
+                    if request.value(forHTTPHeaderField: "Authorization") == "Bearer \(f.pushToken ?? "")" {
+                        result = ["verified": true, "challenge": request.value(forHTTPHeaderField: "x-tincall-push-challenge") ?? ""]
+                    } else {
+                        return (403, ["error": "forbidden"], false)
+                    }
                 } else { preconditionFailure("Unexpected project route") }
                 f.calls.append(operation)
                 if f.failure == operation {
@@ -317,6 +329,15 @@ private final class DeploymentProtocol: URLProtocol, @unchecked Sendable {
             _ = try await run(service())
             precondition(fixture.pushToken == pending && fixture.registrations == 2)
             print("PASS: a lost enrollment response resumes with the same credential")
+
+            reset()
+            fixture.lock.withLock { fixture.losePushResponse = true }
+            try await failed(service(), at: .push)
+            fixture.lock.withLock { fixture.pushToken = "existing-custom-credential"; fixture.pushURL = "https://custom.invalid" }
+            let customWrites = fixture.secretWrites
+            try await failed(service(), at: .push)
+            precondition(fixture.pushToken == "existing-custom-credential" && fixture.secretWrites == customWrites)
+            print("PASS: a custom sender added during enrollment retry is preserved")
 
             fixture.lock.withLock { fixture.secretNames.removeAll { $0 == "TINCALL_PUSH_TOKEN" } }
             let writes = fixture.secretWrites

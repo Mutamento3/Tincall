@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 // MCP OAuth uses public-client authorization code + PKCE. Approval happens in
 // the owner's authenticated Tincall app; a browser never receives the phone key.
 export class OAuthError extends Error {

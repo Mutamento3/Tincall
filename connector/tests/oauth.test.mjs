@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 import test,{before,after} from 'node:test';
 import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
@@ -8,7 +11,9 @@ import {DatabaseSync} from 'node:sqlite';
 import {createSQLiteStore} from '../sqlite-store.mjs';
 import {createConnector,createSupabaseStore} from '../../supabase/functions/_shared/tincall/service.mjs';
 
-const postgres=process.env.TINCALL_TEST_STORAGE==='postgres';
+const storage=process.env.TINCALL_TEST_STORAGE??'postgres';
+if(!['sqlite','postgres'].includes(storage))throw new Error('TINCALL_TEST_STORAGE only accepts sqlite or postgres');
+const postgres=storage==='postgres';
 const owner='10000000-0000-4000-8000-000000000001';
 const directory=mkdtempSync(join(tmpdir(),'tincall-oauth-'));
 const container='tincall-oauth-test-'+process.pid;

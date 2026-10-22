@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 -- Included by both CLI migrations and the App's deployment/update flow.
 -- IF NOT EXISTS / CREATE OR REPLACE also adopt the former manually applied image SQL.
 alter table public.tincall_messages add column if not exists images jsonb;

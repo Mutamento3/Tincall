@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 import Foundation
 import Observation
 import Security
@@ -312,6 +315,19 @@ final class SupabaseDeploymentService {
                                        saved: inout CloudDeploymentCheckpoint, secretNames: Set<String>) async throws -> Bool {
         #if TINCALL_APP_STORE
         let names: Set<String> = ["TINCALL_PUSH_URL", "TINCALL_PUSH_TOKEN"]
+        if let pushToken = saved.pushToken, names.isSubset(of: secretNames) {
+            // A previous attempt may have written the official names before its response was lost.
+            // Verify that they still contain our pending credential before retrying registration;
+            // never overwrite a sender configured while the retry was pending.
+            guard try await client.verifyConfiguredOfficialPush(ref: ref, token: pushToken) else {
+                throw TincallError(message: String(localized: "检测到已有推送配置，未覆盖原配置；请保留现有发送端，或移除后再重试官方推送开通。"))
+            }
+            try await client.registerOfficialPush(token: pushToken)
+            saved.pushToken = nil
+            saved.completed.insert(.push)
+            try save(saved, ref: ref)
+            return false
+        }
         if saved.pushToken == nil {
             // Keep existing official or custom senders; never rotate a user's working credential.
             if names.isSubset(of: secretNames) { return true }
@@ -320,6 +336,8 @@ final class SupabaseDeploymentService {
             }
             saved.pushToken = "tcpush_\(ref)_\(try Self.token())"
             try save(saved, ref: ref)
+        } else if !names.isDisjoint(with: secretNames) {
+            throw TincallError(message: String(localized: "已有推送配置不完整，请先补齐或移除原配置，再重试部署；原配置未被覆盖。"))
         }
         guard let pushToken = saved.pushToken else { return true }
         _ = try await client.management("\(ref)/secrets", pat: pat, body: [

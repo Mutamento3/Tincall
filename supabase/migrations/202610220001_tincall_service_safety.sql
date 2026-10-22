@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 -- Bound anonymous registration and reclaim idle state without invalidating live grants or requests.
 create or replace function public.tincall_oauth(p_action text,p_payload jsonb default '{}') returns jsonb
 language plpgsql security definer set search_path='' as $$

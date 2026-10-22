@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 -- Minimal Supabase-owned schemas for exercising the real migration in local PostgreSQL.
 create role anon nologin;
 create role authenticated nologin;

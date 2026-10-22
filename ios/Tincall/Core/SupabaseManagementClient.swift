@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 import Foundation
 
 private final class DeploymentNoRedirects: NSObject, URLSessionTaskDelegate, Sendable {
@@ -49,6 +52,37 @@ final class SupabaseManagementClient {
         } catch is CancellationError { throw CancellationError() }
         catch {
             throw TincallError(message: String(localized: "官方来电推送尚未开通。云端配置已保留，请稍后重试部署，会继续完成开通。"))
+        }
+    }
+
+    func verifyConfiguredOfficialPush(ref: String, token: String) async throws -> Bool {
+        let challenge = UUID().uuidString.lowercased()
+        var request = URLRequest(url: URL(string: "https://\(ref).supabase.co/functions/v1/tincall/push/verify")!)
+        request.httpMethod = "POST"
+        request.httpBody = Data("{}".utf8)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        request.setValue(challenge, forHTTPHeaderField: "x-tincall-push-challenge")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
+        do {
+            let (data, response) = try await session.data(for: request)
+            try Task.checkCancellation()
+            guard let http = response as? HTTPURLResponse else {
+                throw TincallError(message: String(localized: "无法核对现有官方推送配置，原配置未被覆盖。"))
+            }
+            if [401, 403].contains(http.statusCode) { return false }
+            guard (200..<300).contains(http.statusCode) else {
+                throw TincallError(message: String(localized: "无法核对现有官方推送配置，原配置未被覆盖。"))
+            }
+            struct Proof: Decodable { let verified: Bool; let challenge: String }
+            guard let proof = try? Self.decode(Proof.self, data), proof.verified, proof.challenge == challenge else {
+                throw TincallError(message: String(localized: "无法核对现有官方推送配置，原配置未被覆盖。"))
+            }
+            return true
+        } catch is CancellationError { throw CancellationError() }
+        catch let error as TincallError { throw error }
+        catch {
+            throw TincallError(message: String(localized: "无法核对现有官方推送配置，原配置未被覆盖。"))
         }
     }
 

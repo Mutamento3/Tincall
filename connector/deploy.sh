@@ -1,4 +1,7 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+# SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 set -eu
 if [ "$#" -ne 2 ]; then
   echo 'Usage: sh connector/deploy.sh PROJECT_REF /absolute/path/to/private-secrets.env' >&2

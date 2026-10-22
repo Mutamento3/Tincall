@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 import {configFromEnvironment, createConnector, createSupabaseStore} from '../_shared/tincall/service.mjs';
 
 const config = configFromEnvironment((key: string) => Deno.env.get(key));

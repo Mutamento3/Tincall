@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 import {connect} from 'node:http2';
 import {createPrivateKey,sign,randomUUID} from 'node:crypto';
 import {readFileSync,mkdirSync,chmodSync} from 'node:fs';

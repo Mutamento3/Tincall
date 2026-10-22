@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 -- MCP delivers complete messages; playback interruption does not invalidate a later submission.
 alter table public.tincall_calls add column if not exists mcp_dial_until timestamptz;
 alter table public.tincall_calls add column if not exists user_name text not null default '';

@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 -- All data belongs to the deployer's Supabase project. No publisher service is involved.
 create table public.tincall_owners (
   owner_id uuid primary key references auth.users(id) on delete cascade

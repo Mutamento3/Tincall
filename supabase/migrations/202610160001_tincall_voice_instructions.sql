@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 alter table public.tincall_calls
   add column tts_expression_prompt text not null default '',
   add column voice_instructions_sent boolean not null default false;

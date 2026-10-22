@@ -1,4 +1,7 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+# SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 # Build a source edition IPA and its library materials. Does not sign or publish.
 set -euo pipefail
 

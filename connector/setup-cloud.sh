@@ -1,4 +1,7 @@
 #!/bin/sh
+# SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+# SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 # First-time backup setup. Management authorization stays in the official CLI.
 set -eu
 umask 077

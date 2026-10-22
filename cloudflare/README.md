@@ -44,7 +44,7 @@ App 从嵌入的描述文件读取自签环境。不要按 IPA 文件名、Debug
 
 ### 3. 选择并配置一个发送端
 
-选择下面的 Node 或 Cloudflare 路径之一。使用自己的签名与 App 标识时，应部署与之匹配的发送端；仅在 App 中部署 Supabase，不会自动创建 APNs 密钥或发送端。
+下面的 Node 或 Cloudflare 路径供自签版和源码版使用。使用自己的签名与 App 标识时，应部署与之匹配的发送端；这两类安装即使在 App 中部署 Supabase，也不会自动创建 APNs 密钥或发送端。商店版构建 11 起使用 App 部署时自动接入的官方服务。
 
 ## Node 发送端
 
@@ -125,7 +125,7 @@ TINCALL_PUSH_TOKEN=THE_SAME_RANDOM_SERVICE_TOKEN
 ```
 
 - Node 连接端：修改它实际使用的私密环境文件，保留其他配置，然后重启连接端进程；不要将变量只填到 APNs 发送端而遗漏连接端。
-- Supabase：在项目 Edge Functions 的 Secrets 添加或更新这两个值；也可用已授权的 Supabase CLI 执行 `supabase secrets set --project-ref YOUR_PROJECT_REF --env-file /absolute/private/push.env`。该文件只需包含上面两个变量，不能包含 Apple 私钥。App 一键部署不会代填这两个推送配置。
+- Supabase：在项目 Edge Functions 的 Secrets 添加或更新这两个值；也可用已授权的 Supabase CLI 执行 `supabase secrets set --project-ref YOUR_PROJECT_REF --env-file /absolute/private/push.env`。该文件只需包含上面两个变量，不能包含 Apple 私钥。自签版和源码版的 App 一键部署不会代填这两个自有发送端配置；商店版构建 11 起会在没有发送端时接入官方服务。
 - 选择 Node 发送端时，令牌与它的 `TINCALL_PUSH_TOKEN` 一致；选择 Worker 时，与该服务在 `PUSH_CLIENTS` 中的 token 一致。该服务令牌仅用于连接端到发送端，不是手机访问令牌或联系人的 MCP 令牌。
 
 ### 5. 在手机完成绑定并测试

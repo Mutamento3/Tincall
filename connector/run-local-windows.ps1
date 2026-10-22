@@ -1,4 +1,7 @@
-﻿#Requires -Version 5.1
+﻿# SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+# SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
+#Requires -Version 5.1
 # Task Scheduler runs this wrapper for the current user. It waits for the child
 # and returns its exit code, allowing the task's restart policy to work.
 [CmdletBinding()]

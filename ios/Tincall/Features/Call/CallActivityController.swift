@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 // ActivityKit's Activity reference lacks Sendable annotations in this SDK.
 // All application-owned activity state remains isolated to the main actor.
 @preconcurrency import ActivityKit

@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 import {DatabaseSync} from 'node:sqlite';
 import {mkdirSync,closeSync,createReadStream,createWriteStream,linkSync,unlinkSync,openSync} from 'node:fs';
 import {dirname,resolve,join} from 'node:path';

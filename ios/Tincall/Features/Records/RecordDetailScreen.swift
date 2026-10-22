@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -29,6 +32,14 @@ struct RecordDetailScreen: View {
     @ScaledMetric(relativeTo: .title) private var titleFontSize = 28.0
 
     var body: some View {
+        let navigation = navigationPresentation(recordContent)
+        let export = exportPresentation(navigation)
+        let deletion = deleteConfirmation(export)
+        let summaryEditor = summaryEditorPresentation(deletion)
+        return summaryModelPresentation(summaryEditor)
+    }
+
+    private var recordContent: some View {
         Group {
             if let record = store.records.first(where: { $0.id == recordID }) {
                 ScrollView {
@@ -130,6 +141,10 @@ struct RecordDetailScreen: View {
                 ContentUnavailableView("记录不存在", systemImage: "phone")
             }
         }
+    }
+
+    private func navigationPresentation<Content: View>(_ content: Content) -> some View {
+        content
         .background {
             Color(.systemBackground).ignoresSafeArea()
         }
@@ -177,6 +192,10 @@ struct RecordDetailScreen: View {
             }
             .sharedBackgroundVisibility(.hidden)
         }
+    }
+
+    private func exportPresentation<Content: View>(_ content: Content) -> some View {
+        content
         .alert("导出通话备份", isPresented: $isConfirmingExport) {
             Button("选择位置并导出文件夹") {
                 do {
@@ -195,6 +214,10 @@ struct RecordDetailScreen: View {
             if case .failure(let error) = result { errorMessage = String(localized: "导出失败：\(error.localizedDescription)") }
             backup = nil
         }
+    }
+
+    private func deleteConfirmation<Content: View>(_ content: Content) -> some View {
+        content
         .alert("删除这通电话？", isPresented: $isConfirmingDelete) {
             Button("删除", role: .destructive) {
                 playback.stop()
@@ -203,6 +226,10 @@ struct RecordDetailScreen: View {
             }
             Button("取消", role: .cancel) { }
         } message: { Text("本机的文字、摘要和已保存音频会一起删除。已导出的备份与云端副本不受影响。") }
+    }
+
+    private func summaryEditorPresentation<Content: View>(_ content: Content) -> some View {
+        content
         .sheet(isPresented: $isEditingSummary) {
             NavigationStack {
                 Form {
@@ -227,6 +254,10 @@ struct RecordDetailScreen: View {
                 }
             }
         }
+    }
+
+    private func summaryModelPresentation<Content: View>(_ content: Content) -> some View {
+        content
         .sheet(isPresented: $isChoosingSummaryModel) {
             NavigationStack {
                 List {

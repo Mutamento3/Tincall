@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 import SwiftUI
 import AVFoundation
 import Contacts
@@ -61,6 +64,15 @@ struct RoleEditor: View {
     }
 
     var body: some View {
+        let confirmation = confirmationPresentation(editorContent)
+        let pickers = pickerPresentation(confirmation)
+        let contacts = contactAccessPresentation(pickers)
+        let lifecycle = lifecyclePresentation(contacts)
+        let photoSelection = photoSelectionTask(lifecycle)
+        return backgroundSelectionTask(photoSelection)
+    }
+
+    private var editorContent: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 identityCard
@@ -112,6 +124,10 @@ struct RoleEditor: View {
         .background {
             ContactDismissGuard(isBlocked: isSavingRole, hasUnsavedChanges: hasUnsavedChanges, onAttempt: requestDismiss)
         }
+    }
+
+    private func confirmationPresentation<Content: View>(_ content: Content) -> some View {
+        content
         .alert("要保存更改吗？", isPresented: $showsUnsavedChanges) {
             Button("保存", action: save).disabled(cannotSave)
             Button("放弃更改", role: .destructive, action: close)
@@ -123,6 +139,10 @@ struct RoleEditor: View {
         } message: {
             Text("从 Tincall 移除“\(store.roles.first(where: { $0.id == role.id })?.displayName ?? role.displayName)”。系统通讯录和已有通话记录会保留。")
         }
+    }
+
+    private func pickerPresentation<Content: View>(_ content: Content) -> some View {
+        content
         .sheet(isPresented: $isShowingContactPicker, onDismiss: invalidateSelection) {
             SystemContactPicker(reader: store.contactReader, onSelect: selectSystemContact)
         }
@@ -146,6 +166,10 @@ struct RoleEditor: View {
                       allowedContentTypes: [.plainText, UTType(filenameExtension: "md") ?? .plainText]) { result in
             importPrompt(result)
         }
+    }
+
+    private func contactAccessPresentation<Content: View>(_ content: Content) -> some View {
+        content
         .contactAccessPicker(isPresented: $isShowingAccessPicker) { @Sendable _ in
             // ContactsUI can invoke this completion on its XPC queue, not the main actor.
             Task { @MainActor in
@@ -159,6 +183,10 @@ struct RoleEditor: View {
                 if savedRole.linkedContact?.identifier == snapshot.identifier { savedRole.linkedContact = snapshot }
             }
         }
+    }
+
+    private func lifecyclePresentation<Content: View>(_ content: Content) -> some View {
+        content
         .task(id: saveRequestID) {
             guard saveRequestID != nil else { return }
             await saveMCPRole()
@@ -187,6 +215,10 @@ struct RoleEditor: View {
             selectedBackground = nil
             invalidateSelection()
         }
+    }
+
+    private func photoSelectionTask<Content: View>(_ content: Content) -> some View {
+        content
         .task(id: selectedPhoto) {
             guard let photo = selectedPhoto else { isLoadingPhoto = false; return }
             isLoadingPhoto = true
@@ -208,6 +240,10 @@ struct RoleEditor: View {
                 }
             }
         }
+    }
+
+    private func backgroundSelectionTask<Content: View>(_ content: Content) -> some View {
+        content
         .task(id: selectedBackground) {
             guard let photo = selectedBackground else { isLoadingBackground = false; return }
             isLoadingBackground = true

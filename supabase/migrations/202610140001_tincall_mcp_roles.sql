@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 -- Role enrollment is runtime data, so adding a contact never requires redeployment.
 -- Recoverable random credentials are private to the service. They are deliberately
 -- excluded from authenticated table access, capability lists and call records.

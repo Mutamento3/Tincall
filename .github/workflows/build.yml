@@ -1,0 +1,147 @@
+name: build
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Cloudflare tests
+        run: node --test cloudflare/tests/*.test.mjs
+      - name: Connector tests (SQLite)
+        env:
+          TINCALL_TEST_STORAGE: sqlite
+        run: find connector/tests -maxdepth 1 -type f -name '*.test.mjs' ! -name 'install-local.test.mjs' -exec node --test {} +
+      - name: Connector tests (PostgreSQL)
+        env:
+          TINCALL_TEST_STORAGE: postgres
+        run: find connector/tests -maxdepth 1 -type f -name '*.test.mjs' ! -name 'install-local.test.mjs' -exec node --test {} +
+  installer:
+    name: Installer tests (macOS)
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Installer tests
+        run: node --test connector/tests/install-local.test.mjs
+  build:
+    name: Xcode ${{ matrix.xcode }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: macos-26, xcode: "26.4" }
+          - { runner: macos-26, xcode: "26.6" }
+          - { runner: xcode-27, xcode: "27" }
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select Xcode
+        shell: bash
+        run: |
+          ls -d /Applications/Xcode*.app
+          expected='${{ matrix.xcode }}'
+          shopt -s nullglob
+          apps=(/Applications/Xcode_${expected}*.app)
+          if (( ${#apps[@]} )); then
+            app="${apps[${#apps[@]}-1]}"
+          elif [[ "$expected" == 27 ]]; then
+            app=/Applications/Xcode.app
+          else
+            echo "::error::Xcode $expected is not installed"
+            exit 1
+          fi
+          sudo xcode-select -s "$app/Contents/Developer"
+          version_output=$(xcodebuild -version)
+          echo "$version_output"
+          first_line=${version_output%%$'\n'*}
+          version=${first_line#Xcode }
+          if [[ "$version" != "$expected" && "$version" != "$expected".* ]]; then
+            echo "::error::Expected Xcode $expected, got $first_line"
+            exit 1
+          fi
+          xcodebuild -showsdks | grep -i iphoneos
+      - name: Build for iOS device (no signing)
+        shell: bash
+        run: |
+          if xcodebuild -project ios/Tincall.xcodeproj -scheme Tincall -configuration Release \
+            -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/dd" \
+            CODE_SIGNING_ALLOWED=NO build > "$RUNNER_TEMP/build.log" 2>&1; then
+            code=0
+          else
+            code=$?
+          fi
+          echo "=== errors ==="
+          awk '/error:/ && !seen[$0]++ { if (count++ < 60) print }' "$RUNNER_TEMP/build.log"
+          echo "=== tail ==="
+          tail -15 "$RUNNER_TEMP/build.log"
+          exit "$code"
+      - name: Upload failed build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-xcode-${{ matrix.xcode }}
+          path: ${{ runner.temp }}/build.log
+          retention-days: 7
+  app-store:
+    name: App Store edition (Xcode 27)
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select Xcode
+        shell: bash
+        run: |
+          ls -d /Applications/Xcode*.app
+          shopt -s nullglob
+          apps=(/Applications/Xcode_27*.app)
+          if (( ${#apps[@]} )); then
+            app="${apps[${#apps[@]}-1]}"
+          else
+            app=/Applications/Xcode.app
+          fi
+          sudo xcode-select -s "$app/Contents/Developer"
+          version_output=$(xcodebuild -version)
+          echo "$version_output"
+          first_line=${version_output%%$'\n'*}
+          version=${first_line#Xcode }
+          if [[ "$version" != 27 && "$version" != 27.* ]]; then
+            echo "::error::Expected Xcode 27, got $first_line"
+            exit 1
+          fi
+          xcodebuild -showsdks | grep -i iphoneos
+      - name: Build App Store edition for iOS device (no signing)
+        shell: bash
+        run: |
+          if xcodebuild -project ios/Tincall.xcodeproj -scheme Tincall-AppStore -configuration StoreRelease \
+            -destination 'generic/platform=iOS' -derivedDataPath "$RUNNER_TEMP/dd" \
+            CODE_SIGNING_ALLOWED=NO build > "$RUNNER_TEMP/build.log" 2>&1; then
+            code=0
+          else
+            code=$?
+          fi
+          echo "=== errors ==="
+          awk '/error:/ && !seen[$0]++ { if (count++ < 60) print }' "$RUNNER_TEMP/build.log"
+          echo "=== tail ==="
+          tail -15 "$RUNNER_TEMP/build.log"
+          exit "$code"
+      - name: Upload failed build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log-app-store-xcode-27
+          path: ${{ runner.temp }}/build.log
+          retention-days: 7

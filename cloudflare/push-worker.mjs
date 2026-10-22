@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+// SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 import { PushError, requireValue, sendAPNs } from './apns.mjs';
 import { ActivityPushError, LiveActivityPushRegistry, validateActivityToken } from '../connector/live-activity-push.mjs';
 

@@ -1,3 +1,6 @@
+-- SPDX-FileCopyrightText: 2026 Chuli (GitHub: chuli1122) <https://github.com/chuli1122/Tincall>
+-- SPDX-License-Identifier: LicenseRef-Tincall-Personal-Use
+
 -- Short-lived transport mailboxes, shared by independently routed Edge requests.
 create table public.tincall_mcp_sse (
   id uuid primary key,
