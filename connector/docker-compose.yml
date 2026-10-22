@@ -1,0 +1,36 @@
+services:
+  connector:
+    build:
+      context: ..
+      dockerfile: connector/Dockerfile
+    init: true
+    restart: unless-stopped
+    env_file:
+      - ${TINCALL_LOCAL_ENV_FILE:-./.local/local.env}
+    environment:
+      HOST: 0.0.0.0
+      PORT: "8787"
+      TINCALL_STORAGE: sqlite
+      TINCALL_SQLITE_PATH: /app/connector/data/tincall.sqlite
+    ports:
+      - "127.0.0.1:${TINCALL_LOCAL_PORT:-8787}:8787"
+    volumes:
+      - data:/app/connector/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/capabilities').then(r=>process.exit(r.status===401?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    profiles: [tunnel]
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "--protocol", "http2", "--url", "http://connector:8787"]
+    depends_on:
+      connector:
+        condition: service_healthy
+
+volumes:
+  data:
+    name: tincall-local-data

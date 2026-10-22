@@ -1,0 +1,6 @@
+project_id = "tincall"
+
+[functions.tincall]
+# The function verifies Supabase Auth sessions or an explicitly owner-bound server token.
+# Disabling the legacy gateway JWT check permits publishable keys and MCP credentials.
+verify_jwt = false

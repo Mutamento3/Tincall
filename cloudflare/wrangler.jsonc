@@ -1,0 +1,13 @@
+{
+  "name": "tincall-push",
+  "main": "push-worker.mjs",
+  "compatibility_date": "2026-10-19",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": false },
+  "vars": { "APNS_TOPIC": "com.tincall.app.voip" },
+  "durable_objects": {
+    "bindings": [{ "name": "PUSH_REGISTRIES", "class_name": "PushRegistry" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PushRegistry"] }]
+}

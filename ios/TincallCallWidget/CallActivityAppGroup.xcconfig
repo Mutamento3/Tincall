@@ -1,0 +1,10 @@
+// Shared by the app and widget, in Debug and Release. Change the group ID here for self-signing.
+TINCALL_APP_GROUP_IDENTIFIER = group.com.tincall.app
+INFOPLIST_KEY_TincallAppGroupIdentifier = $(TINCALL_APP_GROUP_IDENTIFIER)
+
+// Shipping builds include push. A signing team without APNs can explicitly override this.
+TINCALL_PUSH_ENTITLEMENTS = Tincall/Resources/TincallPush.entitlements
+TINCALL_APNS_ENVIRONMENT = production
+TINCALL_APNS_ENVIRONMENT[config=Debug] = development
+
+TINCALL_APNS_ENVIRONMENT[config=StoreDebug] = development

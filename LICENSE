@@ -1,0 +1,153 @@
+# Tincall 个人使用源码许可协议
+
+Tincall Personal-Use Source-Available License
+
+Copyright © Chuli（GitHub: chuli1122）。保留所有权利。All rights reserved.
+
+## 中文条款（具有优先效力）
+
+### 许可目的
+
+Tincall 由作者持续开发和维护。作者以 App Store 成品版的付费买断收入支持项目维护、功能开发及系统与服务适配；公开源码是为了让使用者能够了解、学习、修改并为自己使用本项目。
+
+**个人自用与为他人提供产品或服务是本协议的主要边界。未经作者事先书面授权，不得将本作品商业化，不得为他人部署，也不得把原版或修改版的部署、安装包或功能提供给他人使用，无论收费还是免费。** 下列条款规定具体的许可范围、限制与例外。
+
+### 1. 定义与适用范围
+
+“作者”指 Chuli（GitHub: chuli1122）。“本作品”指作者在 https://github.com/chuli1122/Tincall 明确按本协议提供且有权授权的 Tincall 源码、文档及配套资源，包括客户端、连接端、云端组件和部署工具。“修改版”指对本作品全部或部分内容进行修改、改编、移植、组合或其他形成的衍生版本；仅提取其中一部分使用，不免除相应许可限制。
+
+“你”指依据本协议使用本作品的自然人。“个人自用”指仅供你本人进行非商业使用；设备可以是本人控制的手机、电脑或租用的私有云环境。“他人”包括你以外的自然人或组织，不因对方是朋友、家人、社群成员、客户或同事而豁免。本作品采用源码公开（source-available）方式提供，不宣称为符合开放源代码定义的开源许可。本协议仅授予下文明确列出的权利，未授予的权利由作者保留。
+
+“书面”包括纸质文件，以及能够有形表现所载内容并可随时调取查用的电子邮件、平台私信等数据电文，不要求使用纸质信件。通知的到达和生效时间依适用法律及双方有效约定确定，不仅因发出就一律视为对方已经收到。
+
+第三方代码、模型、字体、图片和其他材料按其各自许可提供，不受本协议重新许可。本协议不缩减第三方许可直接授予或明确要求保留的权利，包括适用 LGPL 等许可时对相关库的修改、替换、重链接及为调试该等修改所需的逆向工程权利。作者无权授权的材料不在本协议范围内。本协议不要求你转让自己的通话内容、个人数据或独立作品的权利。
+
+### 2. 允许的个人使用
+
+在持续遵守本协议的前提下，作者授予你非独占、不可转让、不可再许可、免许可费的有限许可，用于个人非商业的阅读、学习、复制、修改、构建、安装、运行及自部署，运行与部署仅供你本人使用。你可保留必要的私人副本和备份，须保留版权、许可及免责声明。
+
+你可以免费分享原版或修改版的源码、补丁和 fork，条件是在分发材料中保留原有的 Chuli（GitHub: chuli1122）署名、原项目链接 https://github.com/chuli1122/Tincall ，并完整保留本协议、版权及免责声明。不得删除或隐匿上述署名与来源信息；修改版须清楚标明修改事实及其并非作者发布的官方版本，不得将沿用的原项目内容冒称为你本人原创，也不得为本作品附加与本协议冲突或更宽松的许可。接收者直接依据本协议取得许可，而非由你获得更广泛的授权。此项不包括向他人交付编译产物、安装包、预构建容器镜像或已经运行的服务。
+
+你可以使用本人控制下的编译器、脚本、通用自动化或 AI 工具，为本人完成上述个人部署。你为自用支付云主机、域名、模型 API 或通用工具费用，不因此构成本协议禁止的商业使用；这不授权任何人经营 Tincall 代部署或托管服务。分享官方仓库链接、教程和一般操作建议，本身不属于为他人实际部署。
+
+### 3. 禁止的行为
+
+除作者另行事先书面授权外，你不得：
+
+1. 向他人分发、出售、出借或提供本作品或修改版的编译产物、安装包、预构建容器镜像或其他可直接安装运行的交付物，包括免费提供。符合第 2 条条件的源码、补丁和 fork 分享除外。
+2. 替他人实际安装、配置、搭建、部署、代运行或代维护本作品或修改版。即使在对方的设备、账户或服务器上完成，或完成后交由对方管理，也属于为他人部署；第 2 条允许的本人自助部署除外。
+3. 将已部署的本作品、修改版或其中的功能提供给任何他人使用，包括共享实例、账号、接口、远程访问、托管服务、公开演示服务或封闭社群服务；是否开放注册、是否有偿均不影响本限制。
+4. 通过部署、代搭、安装、转卖、租赁、订阅、托管、打包交付或其他方式，直接或间接就本作品或其功能收取费用、报酬或其他对价。使用「仅收服务器成本」「技术支持费」「会员附赠」等名义不构成豁免。
+5. 将本作品或修改版用于商业目的，包括经营、营利、获客、广告变现、商业产品或服务，以及企业或其他组织的业务活动；即使不直接向使用者收费，仍属于商业使用。
+
+**为他人部署或提供使用的限制独立于商业使用限制。免费、无利润、小范围分享、朋友或社群内部使用、仅收成本费，均不自动获得授权。** 修改代码、更改名称、替换图标、调整界面或只使用部分受本协议保护的代码，也不免除这些限制。
+
+上述行为均须事先取得作者书面授权；授权须明确涵盖实际用途及服务、部署或分发范围，不能将某一用途的授权推定为所有用途的许可。
+
+### 4. 名称与图标
+
+本协议不授予独立的 Tincall 名称、标识、图标或其他品牌权益。你可以为准确介绍项目、注明来源、分享官方链接及按本协议保留源码署名而使用项目名称；个人自用版本可以保留原名称和图标。不得使他人误以为你的修改版、安装包、商店条目或服务由作者发布、认可或维护。
+
+未经作者另行书面授权，不得将 Tincall 名称、标识或图标用于你向他人提供的安装包、商店条目或服务。更名或替换图标不免除第 3 条的限制。
+
+### 5. 官方版本与作者运营的服务
+
+通过 App Store 等作者授权渠道合法取得的官方成品版，其安装和使用按取得时适用的授权条款及平台规则办理，本源码许可不额外限制该等合法使用权。购买官方 App 不等于取得商业运营、向他人部署、分发安装包或提供共享服务的授权。
+
+如作者通过官方仓库 Releases 提供标明供个人自签的 IPA，你可以下载并使用自己的签名方式，在本人控制的设备上安装、运行和更新，仅供个人非商业使用。此项不授权你向他人再分发原包或重签后的安装包、代签代装或提供共享服务；你可以分享官方发布页链接。签名及安装仍须遵守适用的平台规则。
+
+作者另行运营的云端推送等服务，包括其服务器、账号、域名、凭据、配额和服务访问权，不在本源码许可授权范围内。本作品中如提供推送客户端或供个人自用部署的发送端代码，许可仅及于明确提供的代码，不因此授予使用、接入、复制或运营作者云端服务的权利。服务使用须另行获得授权并遵守其服务条款。
+
+### 6. 终止
+
+违反本协议时，本协议授予你的许可立即终止，无需作者另行通知。终止期间，你须停止依本协议进行的使用、分发、部署和服务，并删除依本协议持有的本作品及修改版副本。为纠正违约或依法保留证据所必要的副本可暂时封存，不得继续运行、传播或向他人提供；不再需要保留且许可未恢复时应删除。
+
+若你在收到作者书面通知前自行完整纠正违约行为，或在收到该通知后 30 日内完整纠正，许可自动恢复。完整纠正包括停止违规分发、为他人部署及提供服务等实际违约行为。**同一违约再次发生，或收到通知后超过 30 日仍未完整纠正的，不适用自动恢复，恢复许可须取得作者明确书面同意。** 许可恢复不免除恢复前依法已经产生的责任。
+
+本条的删除义务不涉及你自己的通话内容、个人数据或独立作品；依法必须保留的材料及依第三方独立许可持有的材料，按相应法律或许可处理。第三方材料的独立许可及第 5 条所述官方成品版的合法使用权，不因本条自动终止。
+
+### 7. 无担保与责任限制
+
+在适用法律允许的最大范围内，本作品按“现状”和“可用状态”提供，不附带明示或默示担保，包括适销性、特定用途适用性、不侵权、准确性、可用性或服务持续性的担保。作者不对因使用或无法使用本作品引起的损失或责任负责，包括数据丢失、服务中断、第三方服务费用及间接损失。适用法律不允许排除或限制的责任除外。
+
+**本条不排除或限制适用法律禁止排除或限制的责任，包括适用中国大陆法律时，造成对方人身损害，或因作者故意、重大过失造成对方财产损失而依法应承担的责任。本条不影响官方付费成品版适用的法定消费者权益及平台规则。**
+
+### 8. 解释与其他授权
+
+需要商业使用、为他人部署、分发安装包或提供服务时，请通过官方仓库或作者对外公布的联系方式申请授权，并说明用途、对象、规模、收费方式及所需期限。额外授权须以书面作出，能够确认来自作者本人或其明确授权的代表，并明确授权范围；源码公开、下载可用、作者知悉但未回复，或购买了官方 App，均不构成默示授权。
+
+中文与英文内容不一致时，以中文为准。某条款依法不能执行，不影响其他条款的效力。作者可另行提供书面授权；本协议本身不授予专利、第三方服务或其他未明确授予的权利。适用法律规定不得通过协议排除的权利不受影响；本协议不限制无需取得本协议授权即可依法实施的行为。
+
+## English translation (Chinese controls)
+
+### Purpose
+
+Tincall is developed and maintained by the Author. Revenue from the one-time purchase of the official App Store edition supports ongoing maintenance, development, and compatibility with operating systems and services. Source is made available so that people can understand, study, modify, and use the project for themselves.
+
+**The principal boundary is personal use versus providing a product or service to others. Without the Author’s prior written authorization, You must not commercialize the Work, deploy it for others, or make deployments, installers, or functionality of the original or modified Work available to others, whether paid or free.** The following terms specify the scope, restrictions, and exceptions.
+
+### 1. Definitions and scope
+
+“Author” means Chuli (GitHub: chuli1122). “Work” means the Tincall source code, documentation, and accompanying resources that the Author has the right to license and expressly provides under this agreement at https://github.com/chuli1122/Tincall, including the client, connector, cloud components, and deployment tools. “Modified Version” means a derivative version created by modifying, adapting, porting, combining, or otherwise deriving from all or part of the Work. Using only part of the Work does not remove the applicable restrictions.
+
+“You” means an individual using the Work under this agreement. “Personal use” means noncommercial use solely by You, on a phone, computer, or rented private cloud environment under Your control. “Others” includes any other individual or organization, with no exemption merely because they are friends, family, community members, customers, or colleagues. The Work is source-available; this agreement is not represented as an open source license conforming to the Open Source Definition. Only expressly stated rights are granted; all other rights are reserved.
+
+“Written” includes paper documents and electronic messages, such as email or platform messages, that represent their contents in a tangible form and can be retrieved for later reference. Paper correspondence is not required. The time at which a notice is received and takes effect is determined by applicable law and the parties’ valid agreements; sending alone does not invariably establish receipt.
+
+Third-party code, models, fonts, images, and other materials remain under their respective licenses and are not relicensed here. This agreement does not reduce rights granted directly or expressly required to be preserved by those licenses, including, where the LGPL or similar terms apply, rights to modify, replace, or relink the relevant libraries and to reverse engineer as necessary to debug those modifications. Materials the Author has no right to license are excluded. This agreement does not require You to transfer rights in Your conversations, personal data, or independent works.
+
+### 2. Permitted personal use
+
+Subject to continued compliance, the Author grants You a limited, non-exclusive, non-transferable, non-sublicensable, royalty-free license for personal, noncommercial reading, study, copying, modification, building, installation, operation, and self-deployment. Operation and deployment must be solely for Your own use. Necessary private copies and backups are permitted, retaining copyright notices, license terms, and disclaimers.
+
+You may share original or modified source code, patches, and forks free of charge, provided the distributed materials retain the existing attribution to Chuli (GitHub: chuli1122), the original project URL https://github.com/chuli1122/Tincall, and this license, copyright notices, and disclaimers in full. You must not remove or obscure that attribution or source information. Modified Versions must clearly indicate that modifications have been made and that they are not official versions published by the Author. You must not claim retained portions of the original project as Your own original creation or apply conflicting or more permissive terms to the Work. Recipients receive permission directly under this agreement, not broader rights from You. This permission does not include delivering compiled builds, installers, prebuilt container images, or running services to others.
+
+You may use compilers, scripts, general-purpose automation, or AI tools under Your control to complete the permitted personal deployment for Yourself. Paying for cloud infrastructure, domains, model APIs, or general-purpose tools for Your own use does not by itself constitute prohibited commercial use; it does not authorize anyone to operate a Tincall deployment or hosting service for others. Sharing official repository links, tutorials, or general operating advice does not by itself constitute deployment for others.
+
+### 3. Prohibited activities
+
+Unless the Author separately authorizes it in writing in advance, You must not:
+
+1. Distribute, sell, lend, or otherwise provide compiled builds, installers, prebuilt container images, or other ready-to-install or ready-to-run deliverables of the Work or a Modified Version to others, including free of charge. Source code, patches, and forks shared in accordance with Section 2 are excepted.
+2. Actually install, configure, set up, deploy, operate, or maintain the Work or a Modified Version on behalf of others. This includes doing so on their devices, accounts, or servers, or handing control over to them afterward. Personal self-service deployment permitted by Section 2 is excepted.
+3. Make a deployed Work, Modified Version, or any of its functionality available to others, including through shared instances, accounts, APIs, remote access, hosting, public demo services, or closed community services. The restriction applies regardless of open registration or payment.
+4. Directly or indirectly receive fees, remuneration, or other consideration for deployment, setup, installation, resale, rental, subscriptions, hosting, bundled delivery, or other provision of the Work or its functionality. Descriptions such as “server costs only,” “technical support fee,” or “membership bonus” do not create an exemption.
+5. Use the Work or a Modified Version for commercial purposes, including business operations, profit, customer acquisition, advertising revenue, commercial products or services, or the business activities of companies or other organizations, even without charging end users directly.
+
+**Restrictions on deploying for others or providing use to others apply independently of the commercial-use restriction.** Free access, absence of profit, small-scale sharing, use among friends or community members, or charging only costs does not automatically grant authorization. Modifying code, renaming the project, replacing icons, changing the interface, or using only part of the protected code does not remove these restrictions.
+
+All the activities above require the Author’s prior written authorization covering the actual purpose and scope of services, deployments, or distribution. Authorization for one purpose must not be presumed to authorize all purposes.
+
+### 4. Name and icon
+
+No independent rights in the Tincall name, marks, icons, or other branding are granted. You may use the project name to accurately describe the project, credit its source, share official links, and retain source attribution as required by this agreement. Personal-use builds may retain the original name and icons. You must not suggest that Your Modified Version, installer, store listing, or service is published, endorsed, or maintained by the Author.
+
+Without separate written authorization, You must not use the Tincall name, marks, or icons for installers, store listings, or services You provide to others. Renaming or replacing icons does not waive Section 3.
+
+### 5. Official editions and Author-operated services
+
+Installation and use of official editions lawfully acquired through the App Store or other channels authorized by the Author are governed by the applicable acquisition terms and platform rules. This source license does not additionally restrict those lawful use rights. Purchasing the official App does not grant authorization for commercial operation, deployment for others, distribution of installers, or shared services.
+
+If the Author provides an IPA through the official repository’s Releases expressly for personal signing, You may download it and use Your own signing method to install, run, and update it on devices under Your control, solely for personal noncommercial use. This does not authorize redistribution of the original or re-signed installer, signing or installation for others, or shared services. You may share the official release-page link. Signing and installation remain subject to applicable platform rules.
+
+Cloud push and other services separately operated by the Author, including servers, accounts, domains, credentials, quotas, and access rights, are outside this source license. Any expressly provided push client or sender code for personal deployment is licensed only as code; it grants no right to use, access, copy, or operate the Author’s cloud service. Service access requires separate authorization and compliance with its terms.
+
+### 6. Termination
+
+Any breach immediately terminates Your rights under this agreement without further notice from the Author. During termination, You must stop use, distribution, deployment, and services relying on this agreement and delete copies of the Work and Modified Versions held under it. Copies necessary to cure the breach or lawfully preserve evidence may be temporarily archived, but must not continue to be run, distributed, or provided to others. They must be deleted when no longer needed if Your rights have not been reinstated.
+
+Your rights are automatically reinstated if You fully cure the breach before receiving written notice from the Author, or within 30 days after receiving that notice. Full cure includes ceasing the actual breaches, such as unauthorized distribution, deployment for others, and service provision. **Automatic reinstatement does not apply if the same breach recurs or remains uncured more than 30 days after receipt of notice; reinstatement then requires the Author’s express written consent.** Reinstatement does not discharge liabilities that have already arisen under applicable law before reinstatement.
+
+The deletion obligation does not cover Your own conversations, personal data, or independent works. Materials legally required to be retained, and materials held under independent third-party licenses, remain governed by the relevant law or license. Independent third-party licenses and lawful use rights in official editions described in Section 5 do not automatically terminate under this section.
+
+### 7. No warranty; limitation of liability
+
+To the maximum extent permitted by applicable law, the Work is provided “as is” and “as available,” without express or implied warranties, including merchantability, fitness for a particular purpose, noninfringement, accuracy, availability or continued service. The Author is not liable for losses or liabilities arising from use or inability to use the Work, including data loss, service interruption, third-party service fees or indirect loss. Liabilities that applicable law does not permit to be excluded or limited remain unaffected.
+
+**This section does not exclude or limit liabilities that applicable law prohibits excluding or limiting. Where mainland Chinese law applies, this includes legally imposed liability for personal injury to the other party or for property loss caused by the Author’s intentional misconduct or gross negligence. Statutory consumer rights and platform rules applicable to the official paid edition remain unaffected.**
+
+### 8. Interpretation and other permissions
+
+For commercial use, deployment for others, distribution of installers, or service provision, request authorization through the official repository or contact channels published by the Author, specifying the purpose, recipients, scale, payment arrangements, and requested duration. Additional written authorization must be attributable to the Author or an expressly authorized representative and state its scope. Public source availability, download access, the Author’s awareness without a response, or purchase of the official App does not imply permission.
+
+The Chinese text controls in case of inconsistency. An unenforceable provision does not affect the remaining provisions. The Author may grant separate written permissions. This agreement grants no patent, third-party service, or other rights not expressly stated. Rights that applicable law does not permit to be excluded by agreement remain unaffected; this agreement does not restrict acts that may lawfully be performed without permission under it.

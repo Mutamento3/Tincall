@@ -1,0 +1,12 @@
+# The build context is the repository root; send only runtime sources.
+**
+!connector/
+!connector/Dockerfile
+!connector/server.mjs
+!connector/store.mjs
+!connector/sqlite-store.mjs
+!supabase/
+!supabase/functions/
+!supabase/functions/_shared/
+!supabase/functions/_shared/tincall/
+!supabase/functions/_shared/tincall/*.mjs

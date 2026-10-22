@@ -1,0 +1,89 @@
+{
+  "sourceLanguage" : "zh-Hans",
+  "strings" : {
+    "，麦克风已关闭" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : ", microphone off"
+          }
+        }
+      }
+    },
+    "·" : {
+
+    },
+    "00:00:00" : {
+
+    },
+    "关掉麦克风" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mute Microphone"
+          }
+        }
+      }
+    },
+    "切换到听筒" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch to Earpiece"
+          }
+        }
+      }
+    },
+    "切换到扬声器" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Switch to Speaker"
+          }
+        }
+      }
+    },
+    "切换扬声器" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toggle Speaker"
+          }
+        }
+      }
+    },
+    "打开麦克风" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Unmute Microphone"
+          }
+        }
+      }
+    },
+    "通话中" : {
+      "extractionState" : "stale",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In Call"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

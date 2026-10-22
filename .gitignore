@@ -1,0 +1,14 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.ipa
+*.xcarchive/
+*.p8
+*.p12
+*.mobileprovision
+.wrangler/
+.dev.vars

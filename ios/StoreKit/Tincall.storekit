@@ -1,0 +1,49 @@
+{
+  "identifier": "TincallLocalPurchases",
+  "nonRenewingSubscriptions": [],
+  "products": [
+    {
+      "displayPrice": "0.00",
+      "familyShareable": false,
+      "internalID": "100",
+      "localizations": [
+        {
+          "description": "Try core calling features for seven days. No automatic charge.",
+          "displayName": "7-day Trial",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.tincall.app.trial7days",
+      "referenceName": "7-day Trial",
+      "type": "NonConsumable"
+    },
+    {
+      "displayPrice": "2.99",
+      "familyShareable": false,
+      "internalID": "101",
+      "localizations": [
+        {
+          "description": "Unlock core calling features with a one-time purchase.",
+          "displayName": "Tincall Lifetime Unlock",
+          "locale": "en_US"
+        }
+      ],
+      "productID": "com.tincall.app.lifetime",
+      "referenceName": "Tincall Lifetime Unlock",
+      "type": "NonConsumable"
+    }
+  ],
+  "settings": {
+    "_applicationInternalID": "",
+    "_developerTeamID": "",
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [],
+  "version": {
+    "major": 3,
+    "minor": 0
+  }
+}

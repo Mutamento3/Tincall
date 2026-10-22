@@ -1,0 +1,25 @@
+{
+  "sourceLanguage" : "zh-Hans",
+  "strings" : {
+    "用 ${applicationName} 给 TA 发消息" : {
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "needs_review",
+            "value" : "Message your AI with ${applicationName}"
+          }
+        },
+        "zh-Hans" : {
+          "stringSet" : {
+            "state" : "new",
+            "values" : [
+              "用 ${applicationName} 给 TA 发消息"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

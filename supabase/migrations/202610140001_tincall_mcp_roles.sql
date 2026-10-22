@@ -1,0 +1,92 @@
+-- Role enrollment is runtime data, so adding a contact never requires redeployment.
+-- Recoverable random credentials are private to the service. They are deliberately
+-- excluded from authenticated table access, capability lists and call records.
+create table public.tincall_mcp_roles (
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  role_id uuid not null,
+  contact_id text not null check (length(trim(contact_id)) between 1 and 200),
+  display_name text not null check (length(trim(display_name)) between 1 and 200),
+  token text not null unique check (token ~ '^tcmcp_[0-9a-f]{64}$'),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (owner_id, role_id),
+  unique (owner_id, contact_id)
+);
+alter table public.tincall_mcp_roles enable row level security;
+revoke all on public.tincall_mcp_roles from public, anon, authenticated;
+
+create function public.tincall_mcp_role(p_action text, p_owner uuid, p_payload jsonb default '{}')
+returns jsonb language plpgsql security definer set search_path = '' as $$
+declare
+  saved public.tincall_mcp_roles;
+  rid uuid;
+  cid text;
+  name_value text;
+  created boolean := false;
+  result jsonb;
+begin
+  -- Only the connector may call this after authenticating the phone credential.
+  if coalesce(auth.role(),'') <> 'service_role' then
+    raise exception using errcode='42501', message='forbidden';
+  end if;
+  if p_owner is null then raise exception using errcode='42501', message='unauthorized'; end if;
+  if p_action = 'list' then
+    select coalesce(jsonb_agg(jsonb_build_object('contact_id',contact_id,
+      'display_name',display_name,'mode','tools') order by created_at,role_id),'[]')
+      into result from public.tincall_mcp_roles where owner_id=p_owner;
+    return jsonb_build_object('bindings',result);
+  elsif p_action = 'binding' then
+    select * into saved from public.tincall_mcp_roles
+      where owner_id=p_owner and contact_id=p_payload->>'contact_id';
+    return jsonb_build_object('binding',case when saved.role_id is null then null else
+      jsonb_build_object('contact_id',saved.contact_id,'display_name',saved.display_name,'mode','tools') end);
+  elsif p_action <> 'upsert' then
+    raise exception using errcode='22023', message='unknown_action';
+  end if;
+
+  rid := (p_payload->>'role_id')::uuid;
+  cid := p_payload->>'contact_id';
+  name_value := trim(p_payload->>'display_name');
+  if rid is null or cid is null or length(trim(cid)) not between 1 and 200
+    or name_value is null or length(name_value) not between 1 and 200
+    or coalesce(p_payload->>'token','') !~ '^tcmcp_[0-9a-f]{64}$' then
+    raise exception using errcode='22023', message='invalid_role';
+  end if;
+
+  -- Serialize concurrent first saves and renames, using the existing owner lock.
+  insert into public.tincall_owners(owner_id) values(p_owner) on conflict do nothing;
+  perform 1 from public.tincall_owners where owner_id=p_owner for update;
+  select * into saved from public.tincall_mcp_roles where owner_id=p_owner and role_id=rid;
+  if saved.role_id is not null then
+    if saved.contact_id <> cid then
+      raise exception using errcode='P0001', message='role_identity_conflict';
+    end if;
+    update public.tincall_mcp_roles set display_name=name_value,updated_at=clock_timestamp()
+      where owner_id=p_owner and role_id=rid returning * into saved;
+  else
+    if exists(select 1 from public.tincall_mcp_roles where owner_id=p_owner and contact_id=cid) then
+      raise exception using errcode='P0001', message='role_identity_conflict';
+    end if;
+    insert into public.tincall_mcp_roles(owner_id,role_id,contact_id,display_name,token)
+      values(p_owner,rid,cid,name_value,p_payload->>'token') returning * into saved;
+    created := true;
+  end if;
+  return jsonb_build_object('role_id',saved.role_id,'contact_id',saved.contact_id,
+    'display_name',saved.display_name,'token',saved.token,'token_created',created);
+end $$;
+revoke all on function public.tincall_mcp_role(text,uuid,jsonb) from public, anon, authenticated;
+grant execute on function public.tincall_mcp_role(text,uuid,jsonb) to service_role;
+
+create function public.tincall_mcp_authenticate(p_token text) returns jsonb
+language plpgsql security definer set search_path = '' as $$
+declare result jsonb;
+begin
+  if coalesce(auth.role(),'') <> 'service_role' then
+    raise exception using errcode='42501', message='forbidden';
+  end if;
+  select jsonb_build_object('owner_id',owner_id,'contact_id',contact_id)
+    into result from public.tincall_mcp_roles where token=p_token;
+  return result;
+end $$;
+revoke all on function public.tincall_mcp_authenticate(text) from public, anon, authenticated;
+grant execute on function public.tincall_mcp_authenticate(text) to service_role;

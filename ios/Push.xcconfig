@@ -1,0 +1,4 @@
+// Optional explicit push configuration; regular builds now enable push too.
+TINCALL_PUSH_ENTITLEMENTS = Tincall/Resources/TincallPush.entitlements
+TINCALL_APNS_ENVIRONMENT = production
+TINCALL_APNS_ENVIRONMENT[config=Debug] = development
