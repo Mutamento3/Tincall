@@ -1,6 +1,56 @@
 {
   "sourceLanguage" : "zh-Hans",
   "strings" : {
+  "开通官方来电推送": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Enable official incoming-call push service"
+        }
+      }
+    }
+  },
+  "已有推送配置不完整，请先补齐或移除原配置，再重试部署；原配置未被覆盖。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "The existing push configuration is incomplete. Complete or remove it before retrying deployment. It has not been overwritten."
+        }
+      }
+    }
+  },
+  "官方推送服务未确认开通。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "The official push service has not confirmed registration."
+        }
+      }
+    }
+  },
+  "官方来电推送尚未开通。云端配置已保留，请稍后重试部署，会继续完成开通。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "The official incoming-call push service is not ready. Your cloud configuration is saved. Retry deployment shortly to finish setup."
+        }
+      }
+    }
+  },
+  "部署会同时接入官方来电推送服务，向其提供项目标识和专用推送凭据，不发送聊天或录音。后台来电仍需由你在设置中开启。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Deployment also connects the official incoming-call push service using your project ID and a dedicated push credential. No conversations or recordings are sent. You still choose whether to enable background calls in Settings."
+        }
+      }
+    }
+  },
   "同意并继续": {
     "localizations": {
       "en": {

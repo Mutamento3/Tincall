@@ -18,6 +18,10 @@ private final class DeploymentProtocol: URLProtocol, @unchecked Sendable {
         var vault: [String: String] = [:]
         var clients: [[String: String]] = []
         var worker: String?
+        var pushToken: String?
+        var pushURL: String?
+        var registrations = 0
+        var losePushResponse = false
         var failure: String?
         var failureStatus = 500
         var loseMigrationResponse = false
@@ -37,7 +41,8 @@ private final class DeploymentProtocol: URLProtocol, @unchecked Sendable {
         var footprintSQL: String?
         func reset() {
             versions = []; secretNames = []; functionExists = false; owner = nil; vault = [:]
-            clients = []; worker = nil; failure = nil; failureStatus = 500; loseMigrationResponse = false
+            clients = []; worker = nil; pushToken = nil; pushURL = nil; registrations = 0; losePushResponse = false
+            failure = nil; failureStatus = 500; loseMigrationResponse = false
             legacyKey = false; calls = []; installation = nil; migrationWrites = 0; ownerCreates = 0
             functionWrites = 0; secretWrites = 0; verifyFunctionBody = false; insecure = false; exposed = false; manualImages = false; migrationSQL = [:]; footprintSQL = nil
         }
@@ -52,7 +57,7 @@ private final class DeploymentProtocol: URLProtocol, @unchecked Sendable {
             let (status, value, timeout) = try Self.fixture.lock.withLock { () throws -> (Int, Any, Bool) in
                 let f = Self.fixture
                 let url = request.url!
-                precondition(["api.supabase.com", "\(testRef).supabase.co"].contains(url.host!))
+                precondition(["api.supabase.com", "\(testRef).supabase.co", "tincall-push.tincall-app.workers.dev"].contains(url.host!))
                 let path = url.path
                 var operation = path
                 var result: Any = [:]
@@ -66,12 +71,15 @@ private final class DeploymentProtocol: URLProtocol, @unchecked Sendable {
                         if request.httpMethod == "POST" {
                             let secrets = try JSONSerialization.jsonObject(with: body) as! [[String: String]]
                             let clientsValue = secrets.first { $0["name"] == "TINCALL_CLIENTS" }?["value"]
-                            operation = clientsValue == "[]" ? "secrets.write" : "secrets.bind"
+                            operation = secrets.contains { $0["name"] == "TINCALL_PUSH_TOKEN" } ? "push.secrets"
+                                : clientsValue == "[]" ? "secrets.write" : "secrets.bind"
                             if f.failure != operation {
                                 precondition(secrets.allSatisfy { $0["name"]!.hasPrefix("TINCALL_") })
                                 for secret in secrets {
                                     if !f.secretNames.contains(secret["name"]!) { f.secretNames.append(secret["name"]!) }
                                     if secret["name"] == "TINCALL_WORKER_TOKEN" { f.worker = secret["value"] }
+                                    if secret["name"] == "TINCALL_PUSH_TOKEN" { f.pushToken = secret["value"] }
+                                    if secret["name"] == "TINCALL_PUSH_URL" { f.pushURL = secret["value"] }
                                     if secret["name"] == "TINCALL_CLIENTS" {
                                         f.clients = try JSONSerialization.jsonObject(with: Data(secret["value"]!.utf8)) as! [[String: String]]
                                     }
@@ -152,6 +160,17 @@ private final class DeploymentProtocol: URLProtocol, @unchecked Sendable {
                     precondition(payload["email"] as? String == testEmail && payload["email_confirm"] as? Bool == true)
                     if f.failure != operation { f.owner = testOwner; f.ownerCreates += 1 }
                     result = ["id": testOwner.uuidString, "email": testEmail]
+                } else if url.host == "tincall-push.tincall-app.workers.dev" {
+                    precondition(path == "/services/register" && request.httpMethod == "POST")
+                    precondition(f.pushURL == "https://tincall-push.tincall-app.workers.dev")
+                    precondition(f.pushToken?.hasPrefix("tcpush_\(testRef)_") == true)
+                    precondition(request.value(forHTTPHeaderField: "Authorization") == "Bearer \(f.pushToken!)")
+                    precondition(body == Data("{}".utf8))
+                    precondition(!body.contains(Data(testPAT.utf8)) && !body.contains(Data(testKey.utf8)))
+                    operation = "push.register"
+                    if f.failure != operation { f.registrations += 1 }
+                    if f.losePushResponse { f.losePushResponse = false; f.calls.append(operation); return (200, [:], true) }
+                    result = ["registered": true]
                 } else if path == "/functions/v1/tincall/capabilities" {
                     operation = "capabilities"
                     precondition(f.clients.count == 1 && f.clients[0]["owner_id"] == testOwner.uuidString.lowercased())
@@ -265,6 +284,52 @@ private final class DeploymentProtocol: URLProtocol, @unchecked Sendable {
                 precondition(service.progress.first(where: { $0.step == step })?.status == .failed)
                 precondition(!service.isDeploying)
             }
+        }
+
+        if CommandLine.arguments.contains("--push-only") {
+            reset()
+            _ = try await run(service())
+            #if TINCALL_APP_STORE
+            let originalToken = fixture.pushToken!
+            precondition(fixture.registrations == 1)
+            let recovery = try JSONSerialization.jsonObject(with: credentials.readCloudDeployment(projectRef: testRef)!) as! [String: Any]
+            precondition(recovery["pushToken"] == nil, "Remove the installation copy after successful enrollment")
+            _ = try await run(service())
+            precondition(fixture.registrations == 1 && fixture.pushToken == originalToken)
+            fixture.lock.withLock { fixture.pushToken = "existing-custom-credential"; fixture.pushURL = "https://custom.invalid" }
+            _ = try await run(service())
+            precondition(fixture.pushToken == "existing-custom-credential" && fixture.registrations == 1)
+            print("PASS: Store deployment enrolls once, removes its temporary credential and preserves existing senders")
+
+            // Upgrade an old completed installation that has no push configuration.
+            fixture.lock.withLock {
+                fixture.secretNames.removeAll { $0.hasPrefix("TINCALL_PUSH_") }
+                fixture.pushToken = nil; fixture.pushURL = nil
+            }
+            _ = try await run(service())
+            precondition(fixture.registrations == 2 && fixture.pushToken != originalToken)
+            print("PASS: an old completed deployment without a sender gains automatic enrollment")
+
+            reset()
+            fixture.lock.withLock { fixture.losePushResponse = true }
+            try await failed(service(), at: .push)
+            let pending = fixture.pushToken!
+            _ = try await run(service())
+            precondition(fixture.pushToken == pending && fixture.registrations == 2)
+            print("PASS: a lost enrollment response resumes with the same credential")
+
+            fixture.lock.withLock { fixture.secretNames.removeAll { $0 == "TINCALL_PUSH_TOKEN" } }
+            let writes = fixture.secretWrites
+            try await failed(service(), at: .push)
+            precondition(fixture.secretWrites == writes)
+            print("PASS: incomplete existing sender configuration is not overwritten")
+            #else
+            precondition(fixture.pushToken == nil && fixture.registrations == 0)
+            _ = try await run(service())
+            precondition(fixture.pushToken == nil && fixture.registrations == 0)
+            print("PASS: source deployments never enroll with the official sender")
+            #endif
+            return
         }
 
         reset()

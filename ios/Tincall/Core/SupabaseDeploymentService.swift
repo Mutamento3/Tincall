@@ -39,7 +39,7 @@ enum CloudDeploymentStep: String, Codable, CaseIterable, Sendable {
     case serviceSafety = "迁移：授权注册与推送清理"
     case callContext = "迁移：MCP 通话与授权保护"
     case secrets = "写入函数 secrets", function = "部署 Edge Function", vault = "填写 Vault"
-    case owner = "取得服务密钥并建立 owner", binding = "绑定手机令牌与 owner", connection = "检查能力并保存连接"
+    case owner = "取得服务密钥并建立 owner", binding = "绑定手机令牌与 owner", push = "开通官方来电推送", connection = "检查能力并保存连接"
 }
 
 struct CloudDeploymentProgress: Identifiable, Sendable {
@@ -59,6 +59,7 @@ private struct CloudDeploymentCheckpoint: Codable {
     let phoneToken: String
     var workerToken: String?
     var ownerID: UUID?
+    var pushToken: String?
     var completed: Set<CloudDeploymentStep> = []
 }
 
@@ -196,6 +197,9 @@ final class SupabaseDeploymentService {
                 try start(.function)
                 try await client.deployFunction(ref: ref, pat: pat, resources: resources)
                 saved.completed.insert(step); try save(saved, ref: ref); update(step, status: .completed)
+                try start(.push)
+                let skipped = try await configureOfficialPush(client, ref: ref, pat: pat, saved: &saved, secretNames: Set(secrets.map(\.name)))
+                update(.push, status: .completed, skipped: skipped)
                 try start(.connection)
                 try await onConnect(profile, saved.phoneToken)
                 update(step, status: .completed)
@@ -278,6 +282,9 @@ final class SupabaseDeploymentService {
                 saved.completed.insert(.binding); try save(saved, ref: ref); update(.binding, status: .completed)
             }
 
+            try start(.push)
+            let skipped = try await configureOfficialPush(client, ref: ref, pat: pat, saved: &saved, secretNames: Set(secrets.map(\.name)))
+            update(.push, status: .completed, skipped: skipped)
             try start(.connection)
             try await onConnect(profile, saved.phoneToken)
             // Remove the installation-only worker copy only AFTER the existing save callback succeeds.
@@ -299,6 +306,34 @@ final class SupabaseDeploymentService {
             update(step, status: .failed, reason: reason)
             throw TincallError(message: reason)
         }
+    }
+
+    private func configureOfficialPush(_ client: SupabaseManagementClient, ref: String, pat: String,
+                                       saved: inout CloudDeploymentCheckpoint, secretNames: Set<String>) async throws -> Bool {
+        #if TINCALL_APP_STORE
+        let names: Set<String> = ["TINCALL_PUSH_URL", "TINCALL_PUSH_TOKEN"]
+        if saved.pushToken == nil {
+            // Keep existing official or custom senders; never rotate a user's working credential.
+            if names.isSubset(of: secretNames) { return true }
+            guard names.isDisjoint(with: secretNames) else {
+                throw TincallError(message: String(localized: "已有推送配置不完整，请先补齐或移除原配置，再重试部署；原配置未被覆盖。"))
+            }
+            saved.pushToken = "tcpush_\(ref)_\(try Self.token())"
+            try save(saved, ref: ref)
+        }
+        guard let pushToken = saved.pushToken else { return true }
+        _ = try await client.management("\(ref)/secrets", pat: pat, body: [
+            ["name": "TINCALL_PUSH_URL", "value": SupabaseManagementClient.officialPushURL.absoluteString],
+            ["name": "TINCALL_PUSH_TOKEN", "value": pushToken]
+        ])
+        try await client.registerOfficialPush(token: pushToken)
+        saved.pushToken = nil
+        saved.completed.insert(.push)
+        try save(saved, ref: ref)
+        return false
+        #else
+        return true
+        #endif
     }
 
     private func save(_ checkpoint: CloudDeploymentCheckpoint, ref: String) throws {

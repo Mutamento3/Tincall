@@ -2,6 +2,7 @@ import { PushError, requireValue, sendAPNs } from './apns.mjs';
 import { ActivityPushError, LiveActivityPushRegistry, validateActivityToken } from '../connector/live-activity-push.mjs';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const serviceProject = token => /^tcpush_([a-z0-9]{19,20})_[a-f0-9]{64}$/.exec(token ?? '')?.[1];
 const json = (value, status = 200) => new Response(JSON.stringify(value), {
   status, headers: { 'content-type': 'application/json', 'cache-control': 'no-store' }
 });
@@ -34,12 +35,29 @@ export default {
       requireValue(request.method === 'POST', 'method_not_allowed', 405);
       requireValue(!request.headers.has('origin'), 'origin_forbidden', 403);
       const path = new URL(request.url).pathname;
-      requireValue(['/devices', '/devices/remove', '/push', '/activities/start'].includes(path), 'route_not_found', 404);
+      requireValue(['/services/register', '/devices', '/devices/remove', '/push', '/activities/start'].includes(path), 'route_not_found', 404);
+      const token = request.headers.get('authorization')?.match(/^Bearer (\S+)$/)?.[1];
+      const project = serviceProject(token);
+      if (path === '/services/register') {
+        requireValue(project, 'unauthorized', 401);
+        await body(request);
+        requireValue(env.PUSH_SERVICES, 'push_not_configured', 503);
+        return env.PUSH_SERVICES.get(env.PUSH_SERVICES.idFromName(project)).fetch(new Request('https://service/register', {
+          method: 'POST', headers: { authorization: `Bearer ${token}` }
+        }));
+      }
       let clients;
-      try { clients = JSON.parse(env.PUSH_CLIENTS); } catch { throw new PushError('push_not_configured', 503); }
-      requireValue(Array.isArray(clients) && clients.length > 0 && clients.every(c =>
+      try { clients = JSON.parse(env.PUSH_CLIENTS || '[]'); } catch { throw new PushError('push_not_configured', 503); }
+      requireValue(Array.isArray(clients) && clients.every(c =>
         typeof c.id === 'string' && c.id.length > 0 && typeof c.token === 'string' && c.token.length >= 24), 'push_not_configured', 503);
-      const client = clients.find(c => request.headers.get('authorization') === `Bearer ${c.token}`);
+      let client = clients.find(c => token === c.token);
+      if (!client && project && env.PUSH_SERVICES) {
+        const verified = await env.PUSH_SERVICES.get(env.PUSH_SERVICES.idFromName(project)).fetch(new Request('https://service/authorize', {
+          headers: { authorization: `Bearer ${token}` }
+        }));
+        if (verified.ok) client = { id: `supabase:${project}` };
+        await verified.body?.cancel();
+      }
       requireValue(client, 'unauthorized', 401);
       const value = await body(request);
       requireValue(UUID.test(value.owner_id), 'invalid_owner_id');
@@ -51,6 +69,45 @@ export default {
     } catch (error) { return failure(error); }
   }
 };
+
+// One credential per verified Supabase project. It cannot authorize user data APIs.
+// Keeping the service identity stable preserves device bindings when credentials rotate.
+export class PushService {
+  constructor(ctx) { this.ctx = ctx; }
+
+  async fetch(request) {
+    try {
+      const token = request.headers.get('authorization')?.match(/^Bearer (\S+)$/)?.[1];
+      const project = serviceProject(token);
+      requireValue(project, 'unauthorized', 401);
+      const path = new URL(request.url).pathname;
+      if (path === '/authorize' && request.method === 'GET') {
+        requireValue(await this.ctx.storage.get('credential') === token, 'unauthorized', 401);
+        return json({ authorized: true });
+      }
+      requireValue(path === '/register' && request.method === 'POST', 'route_not_found', 404);
+      return await this.ctx.blockConcurrencyWhile(async () => {
+        const challenge = crypto.randomUUID();
+        let response;
+        try {
+          response = await fetch(`https://${project}.supabase.co/functions/v1/tincall/push/verify`, {
+            method: 'POST', headers: { authorization: `Bearer ${token}`, 'x-tincall-push-challenge': challenge, 'cache-control': 'no-store' },
+            redirect: 'manual', signal: AbortSignal.timeout(8000)
+          });
+        } catch { throw new PushError('service_verification_unavailable', 503); }
+        if (!response.ok) {
+          await response.body?.cancel();
+          throw new PushError('service_verification_failed', 403);
+        }
+        const proof = await body(response);
+        requireValue(proof.verified === true && proof.challenge === challenge, 'service_verification_failed', 403);
+        // Nothing is persisted for an unsuccessful ownership check.
+        await this.ctx.storage.put('credential', token);
+        return json({ registered: true });
+      });
+    } catch (error) { return failure(error); }
+  }
+}
 
 export class PushRegistry {
   constructor(ctx, env) {

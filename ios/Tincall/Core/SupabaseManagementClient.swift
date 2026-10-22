@@ -10,6 +10,7 @@ private final class DeploymentNoRedirects: NSObject, URLSessionTaskDelegate, Sen
 /// Neither request/response bodies nor underlying errors (which can contain credentials) escape.
 @MainActor
 final class SupabaseManagementClient {
+    static let officialPushURL = URL(string: "https://tincall-push.tincall-app.workers.dev")!
     private let session: URLSession
 
     init(configuration: URLSessionConfiguration = .ephemeral) {
@@ -35,6 +36,20 @@ final class SupabaseManagementClient {
         if !parameters.isEmpty { body["parameters"] = parameters }
         if readOnly { body["read_only"] = true }
         return try await management("\(ref)/database/query", pat: pat, body: body)
+    }
+
+    func registerOfficialPush(token: String) async throws {
+        do {
+            let data = try await send(Self.officialPushURL.appendingPathComponent("services/register"),
+                                      headers: ["Authorization": "Bearer \(token)"], body: [String: String]())
+            struct Registration: Decodable { let registered: Bool }
+            guard try Self.decode(Registration.self, data).registered else {
+                throw TincallError(message: String(localized: "官方推送服务未确认开通。"))
+            }
+        } catch is CancellationError { throw CancellationError() }
+        catch {
+            throw TincallError(message: String(localized: "官方来电推送尚未开通。云端配置已保留，请稍后重试部署，会继续完成开通。"))
+        }
     }
 
     func createOwner(ref: String, key: String, email: String) async throws -> UUID {

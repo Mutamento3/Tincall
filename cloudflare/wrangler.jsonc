@@ -7,7 +7,13 @@
   "observability": { "enabled": false },
   "vars": { "APNS_TOPIC": "com.tincall.app.voip" },
   "durable_objects": {
-    "bindings": [{ "name": "PUSH_REGISTRIES", "class_name": "PushRegistry" }]
+    "bindings": [
+      { "name": "PUSH_REGISTRIES", "class_name": "PushRegistry" },
+      { "name": "PUSH_SERVICES", "class_name": "PushService" }
+    ]
   },
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["PushRegistry"] }]
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["PushRegistry"] },
+    { "tag": "v2", "new_sqlite_classes": ["PushService"] }
+  ]
 }

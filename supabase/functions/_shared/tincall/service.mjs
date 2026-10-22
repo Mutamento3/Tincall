@@ -79,6 +79,12 @@ export function createConnector({store, config, schedule = promise => promise.ca
       const publicResponse=await oauth.publicResponse(request,path);if(publicResponse)return publicResponse;
       const token=request.headers.get('authorization')?.match(/^Bearer ([^\s]+)$/)?.[1];
       ensure(token,'unauthorized',401);
+      if(path==='/push/verify') {
+        ensure(request.method==='POST','method_not_allowed',405);
+        ensure(config.pushToken && token===config.pushToken,'forbidden',403);
+        const challenge=uuid(request.headers.get('x-tincall-push-challenge'),'challenge');
+        return json({verified:true,challenge});
+      }
       if(path==='/worker') {
         ensure(request.method==='POST','method_not_allowed',405);
         ensure(config.workerToken && token===config.workerToken,'forbidden',403);

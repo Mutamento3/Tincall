@@ -175,6 +175,10 @@ struct CloudDeploymentGuide<NextSteps: View>: View {
                     Text("Supabase 会接收项目部署配置及必要的账户标识。部署的 Tincall 服务按所启用功能接收通话输入、联系人设定、图片与路由信息；记录和录音同步需另外开启。")
                         .font(.footnote).foregroundStyle(.secondary)
                     if let ref = normalizedProjectRef { Text(verbatim: "https://\(ref).supabase.co").font(.caption) }
+                    if CallAccessStore.isStoreBuild {
+                        Text("部署会同时接入官方来电推送服务，向其提供项目标识和专用推送凭据，不发送聊天或录音。后台来电仍需由你在设置中开启。")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                 }
                 DataSharingAgreementRow(isOn: $allowsDeploymentSharing)
                     .disabled(deploymentRequested || deploymentFinished)
