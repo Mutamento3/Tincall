@@ -1,4 +1,4 @@
-import {ConnectorError, UUID, ensure, uuid, json, incomingCallMetadata} from './protocol.mjs';
+import {ConnectorError, UUID, ensure, json, incomingCallMetadata} from './protocol.mjs';
 
 export function createSupabaseStore(config, fetcher = fetch) {
   ensure(config.supabaseURL && config.serviceKey && config.publicKey, 'server_configuration_missing', 503);
@@ -28,6 +28,7 @@ export function createSupabaseStore(config, fetcher = fetch) {
     return body;
   }
   return {
+    removePushDevice(owner,device){return rpc('tincall_remove_push_device',{p_owner:owner,p_device:device.device_id,p_binding:device.binding_id});},
     async authenticate(token) {
       const configured = (config.clients ?? []).find(client => client.token === token);
       if (configured) return {owner_id: configured.owner_id, contact_id: configured.contact_id ?? null};
@@ -37,12 +38,7 @@ export function createSupabaseStore(config, fetcher = fetch) {
         ensure(principal?.owner_id && principal.contact_id, 'unauthorized', 401);
         return principal;
       }
-      let response;
-      try { response = await fetcher(`${base}/auth/v1/user`, {headers: {apikey: config.publicKey, Authorization: `Bearer ${token}`}, signal: AbortSignal.timeout(10000), redirect: 'error'}); }
-      catch { throw new ConnectorError('authentication_unavailable', 503); }
-      ensure(response.ok, 'unauthorized', 401);
-      const user = await response.json();
-      return {owner_id: uuid(user.id, 'owner_id'), contact_id: null};
+      throw new ConnectorError('unauthorized',401);
     },
     subscribeIncoming: (owner, onCall, onError, signal) => subscribeSupabaseIncoming(config, owner, onCall, onError, signal),
     subscribeWake: (owner, onCall, onError, signal) => subscribeSupabaseIncoming(config, owner, onCall, onError, signal, 'wake'),

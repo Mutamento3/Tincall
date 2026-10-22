@@ -99,6 +99,12 @@ private struct ModelPresetEditor: View {
 
     private var editingExisting: Bool { isExisting || hasSaved }
 
+    private var sharingConnection: ConnectionProfile {
+        var value = connection
+        value.endpoint = URL(string: endpoint.trimmingCharacters(in: .whitespacesAndNewlines))
+        return value
+    }
+
     private var currentSnapshot: ModelPresetSnapshot {
         ModelPresetSnapshot(connection: connection, endpoint: endpoint, temperature: temperature, topP: topP,
                             maxTokens: maxTokens, anthropicBudget: anthropicBudget, geminiBudget: geminiBudget)
@@ -178,6 +184,7 @@ private struct ModelPresetEditor: View {
                 Text((connection.provider == .anthropic ? String(localized: "留空时 Tincall 发送 4096，包含思考和回答的预算。") : String(localized: "留空时不指定输出上限，由所用服务决定。")) + String(localized: "关闭的参数不发送；建议只调整温度或 Top P 其中一项。摘要使用联系人里的单独输出上限。"))
                 .font(.footnote).foregroundStyle(.secondary)
             }
+            ConnectionDataSharingSection(connection: sharingConnection)
             if let errorMessage { Text(errorMessage).font(.footnote).foregroundStyle(.red) }
         }
         .disabled(isWorking)

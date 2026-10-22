@@ -226,6 +226,7 @@ final class CloudSyncClient {
     }
 
     private func request(_ connection: ConnectionProfile, path: [String], method: String = "GET", query: [URLQueryItem] = []) throws -> URLRequest {
+        try DataSharingConsent.require(connection)
         guard connection.provider == .genericConnector, var url = connection.endpoint,
               url.scheme == "https", url.host != nil, url.user == nil, url.password == nil,
               url.query == nil, url.fragment == nil else { throw TincallError(message: String(localized: "请选择用户自有连接端的 HTTPS 基础地址")) }
@@ -247,6 +248,7 @@ final class CloudSyncClient {
     }
 
     private func token(_ connection: ConnectionProfile) throws -> String {
+        try DataSharingConsent.require(connection)
         guard let token = try credentials.read(connectionID: connection.id), !token.isEmpty,
               !token.contains("\r"), !token.contains("\n"), !token.contains("•"), !token.contains("*"), token != "已配置" else {
             throw TincallError(message: String(localized: "请先保存此连接的所属账户访问令牌"))

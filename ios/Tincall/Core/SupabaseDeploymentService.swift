@@ -36,6 +36,7 @@ enum CloudDeploymentStep: String, Codable, CaseIterable, Sendable {
     case mcpConversation = "迁移：MCP 简洁对话"
     case mcpVoiceAck = "迁移：MCP 朗读规则确认"
     case messageImages = "迁移：图片消息"
+    case serviceSafety = "迁移：授权注册与推送清理"
     case secrets = "写入函数 secrets", function = "部署 Edge Function", vault = "填写 Vault"
     case owner = "取得服务密钥并建立 owner", binding = "绑定手机令牌与 owner", connection = "检查能力并保存连接"
 }
@@ -83,7 +84,7 @@ final class SupabaseDeploymentService {
     }
 
     @discardableResult
-    func deploy(pat: String, projectRef: String, email: String? = nil) async throws -> ConnectionProfile {
+    func deploy(pat: String, projectRef: String, email: String? = nil, allowDataSharing: Bool = false) async throws -> ConnectionProfile {
         guard !isDeploying else { throw TincallError(message: String(localized: "已有部署正在进行，请等待它结束。")) }
         isDeploying = true
         progress = CloudDeploymentStep.allCases.map { CloudDeploymentProgress(step: $0) }
@@ -155,6 +156,7 @@ final class SupabaseDeploymentService {
             update(step, status: .completed, skipped: reused)
             let endpoint = URL(string: "https://\(ref).supabase.co/functions/v1/tincall")!
             let profile = ConnectionProfile(id: saved.connectionID, name: String(localized: "Tincall 云端"), provider: .genericConnector, endpoint: endpoint)
+            if allowDataSharing { DataSharingConsent.setAllowed(true, for: profile) }
             var currentHistory = history
             for migration in Self.migrations {
                 // Attribute a failed remote check to the migration being checked, while
@@ -336,7 +338,8 @@ final class SupabaseDeploymentService {
                                      Migration(version: "202610200006", name: "tincall_wake_bridge", step: .wakeBridge),
                                      Migration(version: "202610210001", name: "tincall_mcp_voice_ack", step: .mcpVoiceAck),
                                      Migration(version: "202610210002", name: "tincall_mcp_conversation", step: .mcpConversation),
-                                     Migration(version: "202610210003", name: "tincall_message_images", step: .messageImages)]
+                                     Migration(version: "202610210003", name: "tincall_message_images", step: .messageImages),
+                                     Migration(version: "202610220001", name: "tincall_service_safety", step: .serviceSafety)]
     private static let versions = Set(migrations.map(\.version))
     private struct History: Decodable { let version: String; let name: String? }
     private static func history(_ client: SupabaseManagementClient, ref: String, pat: String) async throws -> [History] {
@@ -392,9 +395,9 @@ final class SupabaseDeploymentService {
         let expectedTables = (applied.contains(migrations[0].version) ? connectorTables : []).union(applied.contains(migrations[2].version) ? ["tincall_mcp_roles"] : []).union(applied.contains(migrations[5].version) ? ["tincall_mcp_sse"] : []).union(applied.contains(migrations[9].version) ? ["tincall_oauth_clients", "tincall_oauth_requests", "tincall_oauth_grants"] : []).union(applied.contains(migrations[12].version) ? ["tincall_wake_bridges"] : [])
         let expectedFunctions = (applied.contains(migrations[0].version) ? connectorFunctions : []).union(applied.contains(migrations[2].version) ? roleFunctions : []).union(applied.contains(migrations[3].version) ? voiceInstructionFunctions : []).union(applied.contains(migrations[4].version) ? ["tincall_recent_calls"] : []).union(applied.contains(migrations[5].version) ? ["tincall_mcp_sse_command"] : []).union(applied.contains(migrations[6].version) ? ["tincall_mcp"] : []).union(applied.contains(migrations[7].version) ? ["tincall_schedule_command", "tincall_schedule_next"] : []).union(applied.contains(migrations[8].version) ? ["tincall_broadcast_incoming"] : []).union(applied.contains(migrations[9].version) ? ["tincall_oauth"] : []).union(applied.contains(migrations[10].version) ? ["tincall_call_presence"] : []).union(applied.contains(migrations[11].version) ? ["tincall_contact_mode"] : []).union(applied.contains(migrations[12].version) ? ["tincall_wake_bridge", "tincall_broadcast_wake"] : [])
         guard Set(footprint.tables) == expectedTables,
-              Set(footprint.functions) == expectedFunctions.union(images ? ["tincall_image_command"] : []),
+              Set(footprint.functions) == expectedFunctions.union(images ? ["tincall_image_command"] : []).union(applied.contains("202610220001") ? ["tincall_remove_push_device"] : []),
               footprint.has_images == images,
-              Set(footprint.policies) == (applied.contains(migrations[0].version) ? mediaPolicies : []),
+              Set(footprint.policies) == (applied.contains(migrations[0].version) && !applied.contains("202610220001") ? mediaPolicies : []),
               footprint.bucket == applied.contains(migrations[0].version), !footprint.bucket || footprint.private_bucket,
               !footprint.insecure_tables,
               footprint.cronJobs.count == (applied.contains(migrations[1].version) ? 1 : 0),
@@ -417,6 +420,8 @@ final class SupabaseDeploymentService {
             guardSQL = "if to_regclass('public.tincall_calls') is null or exists(select 1 from information_schema.columns where table_schema='public' and table_name='tincall_calls' and column_name in ('user_name','mcp_read_sequence','mcp_read_epoch','mcp_dial_until')) then raise exception 'tincall_install_conflict'; end if;"
         case .mcpVoiceAck:
             guardSQL = "if to_regprocedure('public.tincall_mcp(text,uuid,text,jsonb)') is null then raise exception 'tincall_install_conflict'; end if;"
+        case .serviceSafety:
+            guardSQL = "if to_regprocedure('public.tincall_oauth(text,jsonb)') is null or to_regclass('public.tincall_devices') is null then raise exception 'tincall_install_conflict'; end if;"
         case .messageImages:
             guardSQL = "if to_regclass('public.tincall_messages') is null or exists(select 1 from information_schema.columns where table_schema='public' and table_name='tincall_messages' and column_name='images' and udt_name<>'jsonb') then raise exception 'tincall_install_conflict'; end if;"
         case .mcpTools:

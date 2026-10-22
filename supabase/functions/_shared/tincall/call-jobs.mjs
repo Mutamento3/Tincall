@@ -92,19 +92,27 @@ export function createCallJobs({store, config, fetcher, backendMessages}) {
   }
 
   async function deliverPush(owner,push) {
-    let code=null;
+    let code=null;let delivered=0;
     try {
       ensure(config.pushURL && config.pushToken,'push_not_configured',422);
       ensure(new URL(config.pushURL).protocol==='https:','push_url_requires_https',422);
       ensure(push.devices.length>0,'device_not_registered',422);
       for(const device of push.devices) {
-        // Only routing metadata crosses this endpoint. Contact, text and summary stay private.
-        const response=await fetcher(`${config.pushURL.replace(/\/$/,'')}/push`,{method:'POST',headers:{Authorization:`Bearer ${config.pushToken}`,'Content-Type':'application/json','Idempotency-Key':`${push.id}/${device.device_id}`},
-          body:JSON.stringify({owner_id:owner,binding_id:device.binding_id,call_id:push.call_id,contact_id:push.contact_id,source:push.source,event:'incoming_call'}),signal:AbortSignal.timeout(10000),redirect:'error'});
-        ensure(response.ok,'push_delivery_failed',502);
+        try {
+          // Only routing metadata crosses this endpoint. Contact, text and summary stay private.
+          const response=await fetcher(`${config.pushURL.replace(/\/$/,'')}/push`,{method:'POST',headers:{Authorization:`Bearer ${config.pushToken}`,'Content-Type':'application/json','Idempotency-Key':`${push.id}/${device.device_id}`},
+            body:JSON.stringify({owner_id:owner,binding_id:device.binding_id,call_id:push.call_id,contact_id:push.contact_id,source:push.source,event:'incoming_call'}),signal:AbortSignal.timeout(10000),redirect:'error'});
+          if(response.ok){delivered++;await response.body?.cancel();continue;}
+          const failure=await readJSON(response);
+          if((response.status===404 && failure.error?.code==='device_not_registered') || failure.error?.code==='apns_device_expired') {
+            // Match the claimed binding so an in-flight re-registration is never removed.
+            await store.removePushDevice(owner,device);
+          }
+          code='push_delivery_failed';
+        } catch(error) {code=error instanceof ConnectorError ? error.code : 'push_unavailable';}
       }
     } catch(error) {code=error instanceof ConnectorError ? error.code : 'push_unavailable';}
-    await store.command(owner,'push.finish',{push_id:push.id,...(code ? {error_code:code} : {})});
+    await store.command(owner,'push.finish',{push_id:push.id,...(!delivered && code ? {error_code:code} : {})});
   }
 
   return {runOwner, runWorker};

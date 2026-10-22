@@ -21,6 +21,7 @@ final class ChatCompletionClient {
     }
 
     func validate(_ connection: ConnectionProfile) throws {
+        try DataSharingConsent.require(connection)
         _ = try ModelRequestCodec.resolvedEndpoint(connection: connection)
         try ModelRequestCodec.validateParameters(connection)
         _ = try apiKey(connection, override: nil)
@@ -35,6 +36,7 @@ final class ChatCompletionClient {
     }
 
     private func request(connection: ConnectionProfile, url: URL, apiKey: String?, body: Data? = nil, stream: Bool = false) throws -> URLRequest {
+        try DataSharingConsent.require(connection)
         let key = try self.apiKey(connection, override: apiKey)
         var request = URLRequest(url: url)
         request.httpMethod = body == nil ? "GET" : "POST"

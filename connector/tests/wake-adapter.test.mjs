@@ -71,7 +71,7 @@ test('adapter starts commands after pagination, retries, coalesces reconnects, q
       const response = await connector.handle(request);
       if (req.url === '/mcp/wake' && req.method === 'POST') {
         const value = await response.clone().json();
-        if (value.result?.isError===false && value.result.content?.length===0) replies.push(value);
+        if (value.result?.isError===false && value.result.content?.some(item=>item.type==='text' && item.text==='已发送。')) replies.push(value);
       }
       if (res.destroyed) return;
       res.writeHead(response.status, Object.fromEntries(response.headers));

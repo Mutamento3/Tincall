@@ -1,6 +1,196 @@
 {
   "sourceLanguage" : "zh-Hans",
   "strings" : {
+  "请求发起于": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Request started"
+        }
+      }
+    }
+  },
+  "只输入你自己刚在浏览器里看到的授权码。别人发给你的码不要输入，也不要替别人批准授权。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Only enter a code you just saw in your own browser. Never enter a code someone sent you or approve a connection on their behalf."
+        }
+      }
+    }
+  },
+  "确认同步目标？": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Confirm sync destination?"
+        }
+      }
+    }
+  },
+  "目的地：%@。将读取此服务和当前令牌所属账户的记录；之后会按已开启的同步设置向该目标发送通话文字、图片、摘要及另行允许的录音。请确认这是你信任的服务和账户。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Destination: %@. Records will be read from this service and the account identified by the current token. Afterwards, enabled sync settings will send call text, images, summaries and separately authorized recordings to this destination. Confirm that you trust this service and account."
+        }
+      }
+    }
+  },
+  "接收方": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Recipient"
+        }
+      }
+    }
+  },
+  "允许向此服务发送上述数据": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Allow sending the data described above to this service"
+        }
+      }
+    }
+  },
+  "数据发送授权": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Data sharing permission"
+        }
+      }
+    }
+  },
+  "隐私政策": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Privacy Policy"
+        }
+      }
+    }
+  },
+  "数据处理与第三方服务": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Data handling and third-party services"
+        }
+      }
+    }
+  },
+  "尚未填写服务地址": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "No service address entered"
+        }
+      }
+    }
+  },
+  "请先打开此连接的设置，确认接收方并允许数据发送：%@": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Open this connection’s settings to review the recipient and allow data sharing: %@"
+        }
+      }
+    }
+  },
+  "请先确认接收方并允许数据发送。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Review the recipient and allow data sharing first."
+        }
+      }
+    }
+  },
+  "允许部署并向所选项目发送数据": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Allow deployment and data sharing with the selected project"
+        }
+      }
+    }
+  },
+  "迁移：授权注册与推送清理": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Migration: authorization registration and push cleanup"
+        }
+      }
+    }
+  },
+  "此模型服务会接收你启用的角色设定、称呼、历史上下文、当前文字及主动发送的图片或原声音频，用于对话和摘要。内容可能包含个人信息，由该服务按其隐私政策处理。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "This model service receives your enabled persona, preferred name, conversation context, current text, and images or original audio you choose to send, for conversations and summaries. This may include personal data, handled under the service’s privacy policy."
+        }
+      }
+    }
+  },
+  "此语音服务会接收待朗读的回复文字、声音 ID 和合成参数，文字可能包含个人信息，由该服务按其隐私政策处理。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "This speech service receives reply text to read aloud, the voice ID and synthesis settings. Text may include personal data, handled under the service’s privacy policy."
+        }
+      }
+    }
+  },
+  "此识别服务会接收麦克风录到的语音并返回文字，语音可能包含个人信息，由该服务按其隐私政策处理。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "This recognition service receives microphone audio and returns text. Audio may include personal data, handled under the service’s privacy policy."
+        }
+      }
+    }
+  },
+  "此连接端及其接入的 AI 平台会按所用功能接收联系人设定、称呼、通话文字和图片。开启同步后还会接收记录、摘要及另行允许的录音；后台来电会传输设备标识与必要路由信息。请只连接你信任的服务，并了解其数据处理方式。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "This connector and its connected AI platforms receive contact settings, your preferred name, call text and images as needed for the features you use. Enabling sync also shares records, summaries and separately authorized recordings; background calls send device identifiers and necessary routing metadata. Only connect services you trust and understand how they handle data."
+        }
+      }
+    }
+  },
+  "Supabase 会接收项目部署配置及必要的账户标识。部署的 Tincall 服务按所启用功能接收通话输入、联系人设定、图片与路由信息；记录和录音同步需另外开启。": {
+    "localizations": {
+      "en": {
+        "stringUnit": {
+          "state": "translated",
+          "value": "Supabase receives project deployment settings and necessary account identifiers. The deployed Tincall service receives call input, contact settings, images and routing metadata according to enabled features. Record and recording sync must be enabled separately."
+        }
+      }
+    }
+  },
     "远端设备绑定未能自动清除，可在服务端另行移除。本机连接的删除不受影响。": {
       "localizations": {
         "en": {

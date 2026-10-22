@@ -83,7 +83,7 @@ test('switching the linked contact to standalone rejects MCP as a mode mismatch,
     await store.command(owner,'call.create',{request_id:crypto.randomUUID(),call_id:hidden,contact_id:'private-other',source:'mcp'});
     const denied=await dial(enrollment.token);
     assert.equal(denied.isError,true);
-    assert.match(denied.content[0].text,/contact_mode_mismatch/);
+    assert.match(denied.content[0].text,/contact mode mismatch/);
     assert.ok(!JSON.stringify(denied).includes(hidden));
     assert.equal((await store.command(owner,'call.current')).call.id,hidden,'reject mode before unrelated occupancy without ending it');
     await store.command(owner,'call.end',{request_id:crypto.randomUUID(),call_id:hidden,epoch:0});

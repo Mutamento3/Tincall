@@ -450,9 +450,18 @@ export function createSQLiteStore(config={},databasePath=defaultDatabasePath) {
       }else throw new ConnectorError('unknown_action');
       return {};
     });},
+    async removePushDevice(owner,device){
+      run('DELETE FROM tincall_devices WHERE owner_id=? AND id=? AND binding_id=?',owner,device.device_id,device.binding_id);return {};
+    },
     async oauthCommand(action,p={}){return transaction(()=>{
       const after=seconds=>new Date(Date.now()+seconds*1000).toISOString();
       if(action==='client.create'){
+        run('DELETE FROM tincall_oauth_requests WHERE expires_at<=?',now());
+        run('DELETE FROM tincall_oauth_grants WHERE refresh_expires_at<=?',now());
+        run(`DELETE FROM tincall_oauth_clients WHERE created_at<?
+          AND NOT EXISTS(SELECT 1 FROM tincall_oauth_requests r WHERE r.client_id=tincall_oauth_clients.client_id)
+          AND NOT EXISTS(SELECT 1 FROM tincall_oauth_grants g WHERE g.client_id=tincall_oauth_clients.client_id)`,after(-86400));
+        if(get('SELECT count(*) n FROM tincall_oauth_clients WHERE created_at>?',after(-60)).n>=20)throw new ConnectorError('oauth_limit',429);
         if(get('SELECT count(*) n FROM tincall_oauth_clients').n>=1000)throw new ConnectorError('oauth_limit',429);
         insert('oauth_clients',{client_id:p.client_id,client_name:p.client_name,redirect_uris:json(p.redirect_uris),created_at:now()});return {};
       }

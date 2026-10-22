@@ -56,7 +56,14 @@ struct MCPOAuthAuthorizationRequest: Decodable, Sendable {
     }
     let user_code: String
     let client_name: String
+    let requested_at: String?
     let contacts: [Contact]
+    var requestedAt: Date? {
+        guard let requested_at else { return nil }
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: requested_at)
+    }
 }
 
 struct MCPOAuthAuthorizationDecision: Decodable, Sendable {
@@ -198,6 +205,7 @@ final class ExternalCallClient {
     }
 
     func validate(_ connection: ConnectionProfile, tokenOverride: String? = nil) throws {
+        try DataSharingConsent.require(connection)
         guard connection.provider == .genericConnector,
               let url = connection.endpoint, url.scheme == "https", url.host != nil,
               url.user == nil, url.password == nil, url.query == nil, url.fragment == nil else {

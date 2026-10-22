@@ -12,7 +12,7 @@ struct CloudBackupScreen: View {
     @State private var activeRecordID: UUID?
 
     private enum Confirmation: Identifiable {
-        case media, delete(UUID), deleteAll(ConnectionProfile, [CloudSyncRemote]), useLocal(UUID), restore(UUID, Bool), discard
+        case destination, media, delete(UUID), deleteAll(ConnectionProfile, [CloudSyncRemote]), useLocal(UUID), restore(UUID, Bool), discard
         var id: String {
             if case .deleteAll(let connection, _) = self { return "delete-all-\(connection.id)" }
             return String(describing: self)
@@ -108,7 +108,7 @@ struct CloudBackupScreen: View {
             Section {
                 Text(sync.status).font(.footnote)
                 if let connection {
-                    Button("刷新云端记录") { run { await sync.refresh(connection: connection) } }
+                    Button("刷新云端记录") { confirmation = .destination }
                         .disabled(sync.isBusy || isCallActive)
                 }
                 if sync.isBusy {
@@ -260,6 +260,7 @@ struct CloudBackupScreen: View {
 
     private var confirmationTitle: String {
         switch confirmation {
+        case .destination: return String(localized: "确认同步目标？")
         case .media: return String(localized: "允许录音上传与下载？")
         case .delete: return String(localized: "删除这通电话的云端副本？")
         case .deleteAll: return String(localized: "清空当前云端备份？")
@@ -272,6 +273,8 @@ struct CloudBackupScreen: View {
 
     private var confirmationMessage: String {
         switch confirmation {
+        case .destination:
+            return String(localized: "目的地：\(connection?.endpoint?.absoluteString ?? String(localized: "未配置"))。将读取此服务和当前令牌所属账户的记录；之后会按已开启的同步设置向该目标发送通话文字、图片、摘要及另行允许的录音。请确认这是你信任的服务和账户。")
         case .media:
             return String(localized: "目的地：\(connection?.endpoint?.absoluteString ?? String(localized: "未配置"))。录音包含声音和对话隐私，会保存到该项目的私有存储；项目管理者可访问。上传、存储及下载可能产生费用。开启自动同步后，会上传本机已保存的录音，并下载云端已有的录音，不会开启新的录音。")
         case .delete: return String(localized: "将删除这通电话的云端文字、图片、摘要和已备份录音，本机记录保留。之后自动同步或手动点击同步，都不会将这通记录重新上传；其他通话仍正常同步。")
@@ -288,6 +291,7 @@ struct CloudBackupScreen: View {
         if let confirmation, let connection {
             Button("确认", role: confirmation.isDestructive ? .destructive : nil) {
                 switch confirmation {
+                case .destination: run { await sync.refresh(connection: connection, confirmDestinationChange: true) }
                 case .media: save { try sync.setMediaEnabled(true) }
                 case .delete(let id): run { await sync.deleteRemote(connection: connection, id: id) }
                 case .deleteAll(let selectedConnection, let selection):

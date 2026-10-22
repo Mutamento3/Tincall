@@ -20,6 +20,7 @@ for task_file in \
   supabase/migrations/202610210001_tincall_mcp_voice_ack.sql \
   supabase/migrations/202610210002_tincall_mcp_conversation.sql \
   supabase/migrations/202610210003_tincall_message_images.sql \
+  supabase/migrations/202610220001_tincall_service_safety.sql \
   supabase/functions/tincall/index.ts \
   supabase/functions/_shared/tincall/service.mjs \
   supabase/functions/_shared/tincall/protocol.mjs \

@@ -11,6 +11,7 @@ struct CloudDeploymentGuide<NextSteps: View>: View {
     @State private var isConnected = false
     @State private var endpoint = ""
     @State private var token = ""
+    @State private var allowsDeploymentSharing = false
     @State private var connection = ConnectionProfile(name: String(localized: "我的 Tincall 云端"), provider: .genericConnector)
     @State private var isConnecting = false
     @State private var errorMessage: String?
@@ -33,9 +34,23 @@ struct CloudDeploymentGuide<NextSteps: View>: View {
     var body: some View {
         SettingsList {
             if isConnected { connectedStep }
-            else if connectExisting { connectionStep }
-            else { oneClickDeployment }
+            else if connectExisting {
+                connectionStep
+                ConnectionDataSharingSection(connection: sharingConnection)
+            }
+            else {
+                oneClickDeployment
+                Section {
+                    Text("Supabase 会接收项目部署配置及必要的账户标识。部署的 Tincall 服务按所启用功能接收通话输入、联系人设定、图片与路由信息；记录和录音同步需另外开启。")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    if let ref = normalizedProjectRef { Text(verbatim: "https://\(ref).supabase.co").font(.caption) }
+                    Toggle("允许部署并向所选项目发送数据", isOn: $allowsDeploymentSharing)
+                    Link("隐私政策", destination: DataSharingConsent.privacyURL)
+                } header: { SettingsSectionHeading(title: String(localized: "数据发送授权"), caption: "PRIVACY") }
+                .disabled(deploymentRequested)
+            }
         }
+        .onChange(of: deploymentProjectRef) { _, _ in allowsDeploymentSharing = false }
         .id(isConnected)
         .disabled(isConnecting)
         .modifier(SettingsPageStyle(title: isConnected ? String(localized: "连接已完成") : connectExisting ? String(localized: "连接已有服务") : String(localized: "部署或更新服务"), subtitle: isConnected ? String(localized: "服务已保存，选择要设置的功能") : connectExisting ? String(localized: "用于接入通过电脑或服务器手动部署的 Tincall 服务") : String(localized: "首次部署或更新已有服务，完成后自动保存连接"), symbol: "cloud", index: "CLOUD SETUP", dismissDisabled: isConnecting, sectionSpacing: isConnected || connectExisting ? 18 : 10))
@@ -44,10 +59,11 @@ struct CloudDeploymentGuide<NextSteps: View>: View {
             guard deploymentAttempt > 0, deploymentRequested else { return }
             defer { deploymentRequested = false }
             do {
+                guard allowsDeploymentSharing else { throw TincallError(message: String(localized: "请先确认接收方并允许数据发送。")) }
                 guard let projectRef = normalizedProjectRef else {
                     throw TincallError(message: String(localized: "请粘贴有效的 Supabase Project URL 或项目编号。"))
                 }
-                connection = try await deployment.deploy(pat: accessToken, projectRef: projectRef)
+                connection = try await deployment.deploy(pat: accessToken, projectRef: projectRef, allowDataSharing: allowsDeploymentSharing)
                 deploymentFinished = true
                 accessToken = ""
             } catch {
@@ -303,6 +319,12 @@ struct CloudDeploymentGuide<NextSteps: View>: View {
             Button("完成，返回 Tincall 云端") { dismiss() }
                 .foregroundStyle(Color.accentColor)
         } header: { SettingsSectionHeading(title: String(localized: "选择下一步"), caption: "CONNECTED") }
+    }
+
+    private var sharingConnection: ConnectionProfile {
+        var value = connection
+        value.endpoint = validatedEndpoint
+        return value
     }
 
     private var validatedEndpoint: URL? {

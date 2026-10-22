@@ -28,7 +28,7 @@ async function request(path,{method='GET',token,json,form}={}){
 }
 const post=(path,json,token)=>request(path,{method:'POST',json,token});
 async function register(overrides={}){
-  const result=await post('/oauth/register',{redirect_uris:[callback],client_name:'ChatGPT',token_endpoint_auth_method:'none',...overrides});assert.equal(result.status,201);return (await result.json()).client_id;
+  const result=await post('/oauth/register',{redirect_uris:[callback],client_name:'ChatGPT',token_endpoint_auth_method:'none',...overrides});assert.equal(result.status,201,await result.clone().text());return (await result.json()).client_id;
 }
 async function pending(client=undefined,overrides={}){
   client??=await register();
@@ -56,16 +56,17 @@ before(async()=>{
     execFileSync('docker',['run','--rm','-d','--name',container,'-e','POSTGRES_HOST_AUTH_METHOD=trust','postgres:18-alpine'],{stdio:'pipe'});
     let ready=false;for(let i=0;i<60;i++){try{sql('select 1');ready=true;break;}catch{await new Promise(r=>setTimeout(r,100));}}assert.ok(ready);
     sql(readFileSync(new URL('./bootstrap.sql',import.meta.url),'utf8'));
-    for(const file of ['202610110001_tincall_connector.sql','202610140001_tincall_mcp_roles.sql','202610200003_tincall_mcp_oauth.sql','202610200004_tincall_call_presence.sql'])sql(readFileSync(new URL('../../supabase/migrations/'+file,import.meta.url),'utf8'));
+    for(const file of ['202610110001_tincall_connector.sql','202610140001_tincall_mcp_roles.sql','202610200003_tincall_mcp_oauth.sql','202610200004_tincall_call_presence.sql','202610220001_tincall_service_safety.sql'])sql(readFileSync(new URL('../../supabase/migrations/'+file,import.meta.url),'utf8'));
     store=createSupabaseStore({supabaseURL:'https://local-database.invalid',serviceKey:'fixture',publicKey:'fixture',clients},async(url,init)=>{
       const p=JSON.parse(init.body);let call;
       if(url.endsWith('/tincall_oauth'))call=`tincall_oauth(${quote(p.p_action)},${quote(JSON.stringify(p.p_payload))}::jsonb)`;
+      else if(url.endsWith('/tincall_remove_push_device'))call=`tincall_remove_push_device(${quote(p.p_owner)}::uuid,${quote(p.p_device)}::uuid,${quote(p.p_binding)})`;
       else if(url.endsWith('/tincall_call_presence'))call=`tincall_call_presence(${quote(p.p_action)},${p.p_owner?quote(p.p_owner)+'::uuid':'null'},${p.p_call?quote(p.p_call)+'::uuid':'null'})`;
       else if(url.endsWith('/tincall_mcp_role'))call=`tincall_mcp_role(${quote(p.p_action)},${quote(p.p_owner)}::uuid,${quote(JSON.stringify(p.p_payload))}::jsonb)`;
       else if(url.endsWith('/tincall_mcp_authenticate'))call=`tincall_mcp_authenticate(${quote(p.p_token)})`;
       else throw new Error('Unexpected local RPC');
       try{const result=sql(`set role service_role;set request.jwt.claim.role='service_role';select public.${call};`);return Response.json(result?JSON.parse(result):null);}
-      catch(error){return Response.json({message:error.stderr.toString().match(/ERROR:\s+(\w+)/)?.[1]??'database_request_failed'},{status:400});}
+      catch(error){const code=error.stderr.toString().match(/ERROR:\s+(\w+)/)?.[1];if(!['oauth_limit','forbidden'].includes(code))assert.fail(error.stderr.toString());return Response.json({message:code},{status:400});}
     });
   }else{const file=join(directory,'oauth.sqlite');store=createSQLiteStore({clients},file);db=new DatabaseSync(file);}
   connector=createConnector({store,config:{publicURL:base},schedule:()=>{}});
@@ -88,7 +89,7 @@ test('MCP OAuth discovery works without a bearer at the Supabase-prefixed URL an
 
 test('owner approval exchanges once, binds one contact, survives service restart and cannot read management APIs',async()=>{
   const p=await pending();
-  const lookup=await post('/oauth/requests/lookup',{user_code:p.code},'phone');assert.equal(lookup.status,200);assert.equal((await lookup.json()).contacts.length,2);
+  const lookup=await post('/oauth/requests/lookup',{user_code:p.code},'phone');assert.equal(lookup.status,200);const info=await lookup.json();assert.equal(info.contacts.length,2);assert.ok(Date.now()-Date.parse(info.requested_at)<60000);
   assert.equal((await post('/oauth/requests/lookup',{user_code:p.code},'contact')).status,403);
   assert.equal((await post('/oauth/requests/decide',{user_code:p.code,contact_id:'unregistered',decision:'approve'},'phone')).status,400);
   const authorization=await approve(p);assert.equal(authorization.origin,'https://chatgpt.com');assert.equal(authorization.searchParams.get('state'),'synthetic-state');assert.equal(authorization.searchParams.get('iss'),base);
@@ -99,7 +100,7 @@ test('owner approval exchanges once, binds one contact, survives service restart
   connector=createConnector({store,config:{publicURL:base},schedule:()=>{}});
   const tools=await post('/mcp',{jsonrpc:'2.0',id:1,method:'tools/list'},tokens.access_token);assert.equal(tools.status,200);
   const definition=(await tools.json()).result.tools.find(t=>t.name==='tincall_call');assert.ok(!definition.inputSchema.required.includes('contact_id'));
-  const denied=await post('/mcp',{jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'tincall_call',arguments:{request_id:crypto.randomUUID(),call_id:crypto.randomUUID(),contact_id:'contact-b'}}},tokens.access_token);assert.match(JSON.stringify(await denied.json()),/forbidden/);
+  const denied=await post('/mcp',{jsonrpc:'2.0',id:2,method:'tools/call',params:{name:'tincall_call',arguments:{contact_id:'contact-b'}}},tokens.access_token);assert.match(JSON.stringify(await denied.json()),/forbidden/);
   for(const path of ['/records','/capabilities','/calls/current'])assert.equal((await request(path,{token:tokens.access_token})).status,403);
   assert.equal((await post('/oauth/requests/lookup',{user_code:p.code},tokens.access_token)).status,403);
   const wrongAudience=createConnector({store,config:{publicURL:'https://different.invalid'},schedule:()=>{}});
@@ -122,4 +123,51 @@ test('denial, expiration, wrong client and redirect cannot mint tokens; concurre
   assert.equal((await post('/mcp',{jsonrpc:'2.0',id:1,method:'ping'},tokens.access_token)).status,401);
   expire('oauth_grants','refresh_expires_at','refresh_token',tokens.refresh_token);
   assert.equal((await request('/oauth/token',{method:'POST',form:{grant_type:'refresh_token',client_id:p.client,refresh_token:tokens.refresh_token}})).status,400);
+});
+
+test('registration reclaims idle clients, preserves live authorization and persists its rate limit across service restarts',async()=>{
+  const p=await pending();const authorization=await approve(p);
+  const exchanged=await exchange(p,authorization);assert.equal(exchanged.status,200);
+  const tokens=await exchanged.json();
+  const waiting=await pending();const unused=await register();
+  // Simulate an existing installation with old registrations, using synthetic data only.
+  if(postgres)sql("update public.tincall_oauth_clients set created_at=now()-interval '2 days';");
+  else db.prepare('UPDATE tincall_oauth_clients SET created_at=?').run('2000-01-01T00:00:00.000Z');
+  await register();
+  assert.equal(await store.oauthCommand('client.get',{client_id:unused}),null);
+  assert.ok(await store.oauthCommand('client.get',{client_id:p.client}),'keep a client with a live refresh grant');
+  assert.ok(await store.oauthCommand('client.get',{client_id:waiting.client}),'keep a pending authorization');
+  assert.equal((await post('/mcp',{jsonrpc:'2.0',id:1,method:'ping'},tokens.access_token)).status,200);
+  let accepted=1;
+  for(let n=0;n<20;n++){
+    const r=await post('/oauth/register',{redirect_uris:[callback]});
+    if(r.status===201)accepted++;
+    else {assert.equal(r.status,429);break;}
+  }
+  assert.equal(accepted,20,'at most 20 registrations in a rolling minute');
+  connector=createConnector({store,config:{publicURL:base},schedule:()=>{}});
+  assert.equal((await post('/oauth/register',{redirect_uris:[callback]})).status,429,'restarting cannot reset admission limits');
+  if(postgres)sql("update public.tincall_oauth_clients set created_at=now()-interval '2 minutes' where created_at>now()-interval '1 minute';");
+  else db.prepare('UPDATE tincall_oauth_clients SET created_at=? WHERE created_at>?').run(new Date(Date.now()-120000).toISOString(),new Date(Date.now()-60000).toISOString());
+  await register();
+});
+
+
+test('obsolete push cleanup preserves a concurrently replaced binding and is not callable by anonymous clients',async()=>{
+  const device=crypto.randomUUID();const old='synthetic-old-binding';const current='synthetic-new-binding';
+  if(postgres)sql(`insert into public.tincall_devices(owner_id,id,binding_id) values(${quote(owner)}::uuid,${quote(device)}::uuid,${quote(current)});`);
+  else db.prepare('INSERT INTO tincall_devices(owner_id,id,binding_id) VALUES (?,?,?)').run(owner,device,current);
+  const count=()=>postgres?Number(sql(`select count(*) from public.tincall_devices where id=${quote(device)}::uuid;`)):db.prepare('SELECT count(*) n FROM tincall_devices WHERE id=?').get(device).n;
+  await store.removePushDevice(owner,{device_id:device,binding_id:old});assert.equal(count(),1);
+  await store.removePushDevice(owner,{device_id:device,binding_id:current});assert.equal(count(),0);
+  if(postgres)assert.equal(sql("select has_function_privilege('anon','public.tincall_remove_push_device(uuid,uuid,text)','execute');"),'f');
+});
+
+
+test('ordinary Supabase users cannot invoke the call RPC or write their own paths in Tincall storage',()=>{
+  if(!postgres)return;
+  assert.throws(()=>sql(`set role authenticated;set request.jwt.claim.role='authenticated';set request.jwt.claim.sub=${quote(owner)};select public.tincall_command('call.current','{}');`),/Command failed/);
+  assert.throws(()=>sql(`set role authenticated;set request.jwt.claim.role='authenticated';set request.jwt.claim.sub=${quote(owner)};insert into storage.objects(bucket_id,name) values('tincall-private',${quote(owner+'/synthetic-denied.wav')});`),/Command failed/);
+  assert.equal(sql("select count(*) from pg_policies where schemaname='storage' and tablename='objects' and policyname like 'tincall_media_%';"),'0');
+  assert.ok(sql(`set role service_role;set request.jwt.claim.role='service_role';select public.tincall_command('call.current','{}',${quote(owner)}::uuid);`));
 });

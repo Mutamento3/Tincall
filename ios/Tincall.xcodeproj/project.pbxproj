@@ -16,6 +16,7 @@
 		A00000000000000000000056 /* LAME in Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000055 /* LAME */; };
 		A00000000000000000000057 /* LAME in Embed Frameworks */ = {isa = PBXBuildFile; productRef = A00000000000000000000055 /* LAME */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		A00000000000000000000060 /* LAME LICENSE in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000059 /* LAME LICENSE */; };
+		A00000000000000000000078 /* Tincall/Resources/PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = A00000000000000000000079 /* Tincall/Resources/PrivacyInfo.xcprivacy */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -54,7 +55,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		A00000000000000000000076 /* Tincall.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = StoreKit/Tincall.storekit; sourceTree = "<group>"; };
 		A00000000000000000000012 /* Tincall.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tincall.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A00000000000000000000013 /* Tincall/Resources/Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Tincall/Resources/Info.plist; sourceTree = "<group>"; };
 		A00000000000000000000022 /* Tincall/Voice/Assets/VoiceCallVADAssets */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Tincall/Voice/Assets/VoiceCallVADAssets; sourceTree = "<group>"; };
@@ -64,6 +64,8 @@
 		A00000000000000000000047 /* Tincall/Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Tincall/Localizable.xcstrings; sourceTree = "<group>"; };
 		A00000000000000000000049 /* Tincall/Resources/InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Tincall/Resources/InfoPlist.xcstrings; sourceTree = "<group>"; };
 		A00000000000000000000059 /* LAME LICENSE */ = {isa = PBXFileReference; lastKnownFileType = text; name = "LAME LICENSE"; path = "LocalPackages/LAME/LAME-LICENSE.txt"; sourceTree = "<group>"; };
+		A00000000000000000000076 /* StoreKit/Tincall.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = StoreKit/Tincall.storekit; sourceTree = "<group>"; };
+		A00000000000000000000079 /* Tincall/Resources/PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = Tincall/Resources/PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -112,11 +114,12 @@
 			isa = PBXGroup;
 			children = (
 				A00000000000000000000005 /* Tincall/App */,
-				A00000000000000000000076 /* Tincall.storekit */,
+				A00000000000000000000076 /* StoreKit/Tincall.storekit */,
 				A00000000000000000000059 /* LAME LICENSE */,
 				A00000000000000000000047 /* Tincall/Localizable.xcstrings */,
 				A00000000000000000000006 /* Tincall/Core */,
 				A00000000000000000000013 /* Tincall/Resources/Info.plist */,
+				A00000000000000000000079 /* Tincall/Resources/PrivacyInfo.xcprivacy */,
 				A00000000000000000000049 /* Tincall/Resources/InfoPlist.xcstrings */,
 				A00000000000000000000018 /* Tincall/Features/Call */,
 				A00000000000000000000019 /* Tincall/Features/Settings */,
@@ -257,6 +260,7 @@
 			files = (
 				A00000000000000000000048 /* Tincall/Localizable.xcstrings in Resources */,
 				A00000000000000000000050 /* Tincall/Resources/InfoPlist.xcstrings in Resources */,
+				A00000000000000000000078 /* Tincall/Resources/PrivacyInfo.xcprivacy in Resources */,
 				A00000000000000000000026 /* Tincall/Voice/Assets/VoiceCallVADAssets in Resources */,
 				A00000000000000000000060 /* LAME LICENSE in Resources */,
 			);
@@ -272,24 +276,6 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		A00000000000000000000077 /* Align Embedded ONNX Minimum OS */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-				"$(SRCROOT)/Scripts/align-onnx-framework-minimum-os.sh",
-				"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/onnxruntime.framework/Info.plist",
-				"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/onnxruntime.framework/onnxruntime",
-			);
-			name = "Align Embedded ONNX Minimum OS";
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "sh \"$SRCROOT/Scripts/align-onnx-framework-minimum-os.sh\"";
-		};
 		A00000000000000000000046 /* Bundle Cloud Deployment */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
@@ -328,6 +314,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "sh \"$SRCROOT/Scripts/copy-cloud-deployment-resources.sh\"";
+		};
+		A00000000000000000000077 /* Align Embedded ONNX Minimum OS */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Scripts/align-onnx-framework-minimum-os.sh",
+				"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/onnxruntime.framework/Info.plist",
+				"$(TARGET_BUILD_DIR)/$(FRAMEWORKS_FOLDER_PATH)/onnxruntime.framework/onnxruntime",
+			);
+			name = "Align Embedded ONNX Minimum OS";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "sh \"$SRCROOT/Scripts/align-onnx-framework-minimum-os.sh\"";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -392,7 +396,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "$(TINCALL_PUSH_ENTITLEMENTS)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Tincall/Resources/Info.plist;
@@ -421,7 +425,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "$(TINCALL_PUSH_ENTITLEMENTS)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Tincall/Resources/Info.plist;
@@ -449,7 +453,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = TincallCallWidget/TincallCallWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TincallCallWidget/Info.plist;
@@ -468,7 +472,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = TincallCallWidget/TincallCallWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TincallCallWidget/Info.plist;
@@ -485,10 +489,10 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = A00000000000000000000045 /* TincallCallWidget/CallActivityAppGroup.xcconfig */;
 			buildSettings = {
-				ONLY_ACTIVE_ARCH = YES;
 				CLANG_ENABLE_MODULES = YES;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG TINCALL_APP_STORE";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
@@ -504,8 +508,8 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				SDKROOT = iphoneos;
-				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = TINCALL_APP_STORE;
+				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_VERSION = 6.0;
 			};
 			name = StoreRelease;
@@ -517,7 +521,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "$(TINCALL_PUSH_ENTITLEMENTS)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Tincall/Resources/Info.plist;
@@ -546,7 +550,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = "$(TINCALL_PUSH_ENTITLEMENTS)";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Tincall/Resources/Info.plist;
@@ -574,7 +578,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = TincallCallWidget/TincallCallWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TincallCallWidget/Info.plist;
@@ -593,7 +597,7 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = TincallCallWidget/TincallCallWidget.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 4;
+				CURRENT_PROJECT_VERSION = 5;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TincallCallWidget/Info.plist;

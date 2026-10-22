@@ -34,9 +34,10 @@ final class CloudSyncStore {
         var automaticSyncEnabled = false
         var ledgers: [CloudSyncLedger] = []
         var automaticRetries: [String: AutomaticRetry] = [:]
+        var confirmedScopes: [String: Int] = [:]
 
         private enum CodingKeys: String, CodingKey {
-            case selectedConnectionID, textSyncEnabled, automaticSyncEnabled, ledgers, automaticRetries
+            case selectedConnectionID, textSyncEnabled, automaticSyncEnabled, ledgers, automaticRetries, confirmedScopes
         }
 
         init() { }
@@ -49,6 +50,7 @@ final class CloudSyncStore {
             automaticSyncEnabled = try values.decodeIfPresent(Bool.self, forKey: .automaticSyncEnabled) ?? false
             ledgers = try values.decodeIfPresent([CloudSyncLedger].self, forKey: .ledgers) ?? []
             automaticRetries = try values.decodeIfPresent([String: AutomaticRetry].self, forKey: .automaticRetries) ?? [:]
+            confirmedScopes = try values.decodeIfPresent([String: Int].self, forKey: .confirmedScopes) ?? [:]
         }
     }
 
@@ -128,11 +130,12 @@ final class CloudSyncStore {
         mediaEnabled = enabled
     }
 
-    func refresh(connection: ConnectionProfile) async {
+    func refresh(connection: ConnectionProfile, confirmDestinationChange: Bool = false) async {
         await perform {
-            try await self.bind(connection, allowDestinationChange: true)
+            try await self.bind(connection, allowDestinationChange: confirmDestinationChange)
             self.remoteRecords = try await self.client.list(connection: connection)
             self.sortRemote()
+            try self.clearAutomaticRetry(connection)
             self.status = String(localized: "已连接云端，共 \(self.remoteRecords.count) 通记录。尚未上传本机内容。")
         }
     }
@@ -188,6 +191,7 @@ final class CloudSyncStore {
     }
 
     private func synchronizeContents(connection: ConnectionProfile, automatically: Bool = false) async throws {
+        try await self.bind(connection)
         // Retry connector summaries independently of the optional backup document.
         self.status = String(localized: "正在回传尚未上传的通话摘要…")
         let connector = ExternalCallClient()
@@ -199,7 +203,6 @@ final class CloudSyncStore {
             await connector.uploadSummary(for: record, connection: connection)
         }
         guard self.textSyncEnabled else { throw TincallError(message: String(localized: "请先启用文字和摘要同步")) }
-        try await self.bind(connection)
         try self.requireNoPending()
         self.status = String(localized: "正在检查云端记录版本…")
         let indexes = try await self.client.list(connection: connection)
@@ -444,25 +447,34 @@ final class CloudSyncStore {
     private var ledger: CloudSyncLedger { state.ledgers[scope!] }
 
     private func bind(_ connection: ConnectionProfile, allowDestinationChange: Bool = false) async throws {
-        let previous = scope.map { state.ledgers[$0] }
+        let remembered = state.confirmedScopes[connection.id.uuidString].flatMap { index in
+            state.ledgers.indices.contains(index) && state.ledgers[index].connectionID == connection.id ? index : nil
+        }
+        let previous = (scope ?? remembered).map { state.ledgers[$0] }
+            ?? state.ledgers.last(where: { $0.connectionID == connection.id })
         let owner = try await client.owner(connection: connection)
         guard let endpoint = connection.endpoint?.absoluteString else { throw TincallError(message: String(localized: "云端地址缺失")) }
-        if let index = state.ledgers.firstIndex(where: { $0.connectionID == connection.id && $0.endpoint == endpoint && $0.ownerID == owner }) {
-            scope = index
-        } else {
-            var next = state
-            next.ledgers.append(CloudSyncLedger(connectionID: connection.id, endpoint: endpoint, ownerID: owner))
-            try persist(next)
-            scope = next.ledgers.count - 1
+        if let previous, previous.connectionID != connection.id || previous.endpoint != endpoint || previous.ownerID != owner {
+            remoteRecords = []; conflicts = []; connected = false
+            if !allowDestinationChange { throw TincallError(message: String(localized: "同步目标或所属账户已变更，请重新读取云端列表后操作")) }
         }
+        var next = state
+        let index: Int
+        if let existing = state.ledgers.firstIndex(where: { $0.connectionID == connection.id && $0.endpoint == endpoint && $0.ownerID == owner }) {
+            index = existing
+        } else {
+            next.ledgers.append(CloudSyncLedger(connectionID: connection.id, endpoint: endpoint, ownerID: owner))
+            index = next.ledgers.count - 1
+        }
+        if next.confirmedScopes[connection.id.uuidString] != index {
+            next.confirmedScopes[connection.id.uuidString] = index
+            try persist(next)
+        }
+        scope = index
         connected = true
         mediaEnabled = ledger.mediaConsent
         hasPendingOperation = ledger.pending != nil
         canDiscardPending = ledger.pending.map { !$0.isDelete && (!$0.manifestAttempted || $0.revisionRejected) } ?? false
-        if let previous, previous.connectionID != connection.id || previous.endpoint != endpoint || previous.ownerID != owner {
-            remoteRecords = []; conflicts = []
-            if !allowDestinationChange { throw TincallError(message: String(localized: "同步目标或所属账户已变更，请重新读取云端列表后操作")) }
-        }
     }
 
     private func submit(_ connection: ConnectionProfile, id: UUID, revision: Int, document: CloudSyncDocument?, automatically: Bool = false, preserveCallMedia: Bool? = nil) async throws {

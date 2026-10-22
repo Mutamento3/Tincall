@@ -226,6 +226,7 @@ final class TincallVoiceService: VoiceService {
     }
 
     private func makeSynthesisConfiguration(_ configuration: VoiceConfiguration) throws -> SpeechSynthesisConfiguration {
+        try DataSharingConsent.require(configuration.tts)
         let override = configuration.voiceID.trimmingCharacters(in: .whitespacesAndNewlines)
         let voiceID = override.isEmpty ? configuration.tts.voiceID.trimmingCharacters(in: .whitespacesAndNewlines) : override
         let model = configuration.tts.model.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -465,6 +466,7 @@ final class TincallVoiceService: VoiceService {
     }
 
     private func makeRecognizer(_ stt: ConnectionProfile, session: VoiceSessionID) throws -> any SpeechRecognizer {
+        try DataSharingConsent.require(stt)
         guard stt.provider.isSpeechRecognition,
               stt.provider == .whisperCompatible || stt.endpoint == nil else {
             throw TincallError(message: String(localized: "请选择受支持的语音识别连接"))

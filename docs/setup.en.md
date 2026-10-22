@@ -40,6 +40,8 @@ The project resolves ONNX Runtime 1.24.2 through Swift Package Manager and inclu
 
 In Settings, configure a model connection using its real model ID, API endpoint and credential. Configure speech recognition, such as Apple on-device recognition, and a speech-synthesis connection with a supported model and voice. Apple recognition may need to download a system language model first.
 
+In each external connection’s settings, review the recipient and data disclosure and enable data sharing before testing or calling. Permission is stored locally, outside Tincall configuration backups; changing the destination or provider requires permission again. Apple on-device recognition does not need third-party sharing permission.
+
 Create a contact, select Standalone mode and the saved connections, then place a call. Check microphone input, transcription, model replies, speech playback, interruption, hang-up and saved records.
 
 ## Deploy a connector, only if needed

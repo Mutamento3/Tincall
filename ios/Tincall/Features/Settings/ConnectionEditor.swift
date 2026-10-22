@@ -76,6 +76,14 @@ struct ConnectionEditor: View {
         self.onDelete = onDelete
     }
 
+    private var sharingConnection: ConnectionProfile {
+        var value = connection
+        if [.openAICompatible, .genericConnector, .whisperCompatible].contains(value.provider) {
+            value.endpoint = URL(string: endpoint.trimmingCharacters(in: .whitespacesAndNewlines))
+        }
+        return value
+    }
+
     private var currentSnapshot: ConnectionEditorSnapshot {
         ConnectionEditorSnapshot(connection: connection, endpoint: endpoint)
     }
@@ -265,6 +273,7 @@ struct ConnectionEditor: View {
                     .font(.footnote).foregroundStyle(.secondary)
                 }
             }
+            ConnectionDataSharingSection(connection: sharingConnection)
             if let errorMessage { Section { Label(errorMessage, systemImage: "exclamationmark.triangle").foregroundStyle(.red) } }
             if isExisting, onDelete != nil {
                 Section {
@@ -330,7 +339,7 @@ struct ConnectionEditor: View {
                 if speechTest.isRunning {
                     speechTest.cancel()
                 } else {
-                    speechTest.start(connection: connection, apiKey: apiKey, apiSecret: apiSecret, isCallActive: isCallActive, sampleText: speechTestText)
+                    speechTest.start(connection: sharingConnection, apiKey: apiKey, apiSecret: apiSecret, isCallActive: isCallActive, sampleText: speechTestText)
                 }
             } label: {
                 Label(speechTest.isRunning ? String(localized: "取消测试") : String(localized: "生成并试听"),

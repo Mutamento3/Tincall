@@ -92,6 +92,8 @@ struct MCPOAuthAuthorizationSettings: View {
     var body: some View {
         SettingsList {
             Section {
+                Text("只输入你自己刚在浏览器里看到的授权码。别人发给你的码不要输入，也不要替别人批准授权。")
+                    .font(.subheadline.weight(.semibold)).foregroundStyle(.orange)
                 Text("在 ChatGPT 添加 MCP 服务时选择 OAuth，将授权页显示的一次性授权码填在这里。")
                     .font(.footnote).foregroundStyle(.secondary)
                 TextField("一次性授权码", text: $code)
@@ -101,6 +103,9 @@ struct MCPOAuthAuthorizationSettings: View {
                     Text(decision.approved ? String(localized: "已授权。回到原授权页面刷新，继续连接 ChatGPT。") : String(localized: "已拒绝此次授权。"))
                     Link("返回授权页", destination: decision.continuation_url)
                 } else if let request {
+                    if let date = request.requestedAt {
+                        LabeledContent("请求发起于") { Text(date, style: .relative) }
+                    }
                     SettingsPickerRow(title: String(localized: "允许访问的联系人"),
                         value: request.contacts.first { $0.id == contactID }?.display_name ?? String(localized: "请选择"), selection: $contactID) {
                         Text("请选择").tag(nil as String?)

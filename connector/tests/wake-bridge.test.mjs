@@ -194,7 +194,7 @@ test('bridge MCP over SSE keeps bridge tools and returns after replying',async()
     await post('/calls','phone',{request_id:crypto.randomUUID(),call_id:crypto.randomUUID(),contact_id:'linked',source:'mcp'});
     const input=await (await connector.handle(request('/wake/input',token))).json();
     const reply=await rpc('tools/call',{name:'tincall_reply',arguments:{text:'Synthetic SSE reply'}});
-    assert.equal(reply.isError,false);assert.deepEqual(reply.content,[]);
+    assert.equal(reply.isError,false);assert.deepEqual(reply.content,[{type:'text',text:'已发送。'}]);
     assert.equal((await (await connector.handle(request('/wake/input',token))).json()).structuredContent.event,'idle');
   } finally {
     abort.abort();if(reader)await reader.cancel();await Promise.allSettled(scheduled);store.close();rmSync(directory,{recursive:true,force:true});

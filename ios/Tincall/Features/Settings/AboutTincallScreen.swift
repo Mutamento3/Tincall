@@ -23,6 +23,7 @@ struct AboutTincallScreen: View {
                 explanation(String(localized: "自部署云端：通话文字、图片、摘要及你允许同步的录音，在 App 与你部署的云端之间传输，不经过 Tincall 作者运营的服务。数据保存在你选择的服务器或云服务中，其管理者及服务提供方可能按各自权限访问数据。录音同步需单独允许。"))
                 explanation(String(localized: "后台来电：App Store 版使用由作者维护的推送发送端。设备推送标识和必要的来电路由信息会在你配置的云端与该发送端之间传输，用于向这台 iPhone 发起来电；来电推送不携带聊天正文或录音。自行签名或自部署的版本需要使用自己的匹配推送服务。"))
                 explanation(String(localized: "导出与日志：导出的记录、录音和请求日志可能包含私人对话。日志也可能包含上下文、模型回复和思考内容；分享前请自行审阅，凭据打码不代表内容已匿名。删除本机数据不会自动删除已导出文件或云端副本。"))
+                Link("隐私政策", destination: DataSharingConsent.privacyURL)
             } header: { SettingsSectionHeading(title: String(localized: "数据与隐私"), caption: "PRIVACY") }
             Section {
                 explanation(String(localized: "麦克风用于通话收音和识别测试。关联系统联系人时使用你授权的联系人资料；设置头像、背景或发送图片时，由你选择要使用的图片。这些可选操作无需在首次打开 App 时全部授权。"))

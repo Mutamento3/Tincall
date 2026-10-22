@@ -14,7 +14,7 @@ struct CloudSyncFailure: LocalizedError {
     func uploadSummary(for record: CallRecord, connection: ConnectionProfile) async { }
 }
 @MainActor enum Fixture {
-    static let owner = UUID()
+    static var owner = UUID()
     static var rows: [UUID: CloudSyncRemote] = [:]
     static var replies: [UUID: CloudSyncRemote] = [:]
     static var requests: [UUID] = []
@@ -100,6 +100,37 @@ struct CloudSyncFailure: LocalizedError {
             CallRecord(roleID: UUID(), roleName: "Synthetic", startedAt: Date(timeIntervalSinceNow: -10), endedAt: Date(), messages: [CallMessage(turnID: UUID(), role: .assistant, text: text)], summaryStatus: .completed, summary: "Synthetic summary")
         }
         let connection = ConnectionProfile(name: "Isolated fixture", provider: .genericConnector, endpoint: URL(string: "https://fixture.invalid"))
+        do {
+            Fixture.reset()
+            let (records, sync, directory) = try make("destination-change")
+            let originalOwner = Fixture.owner
+            let initial = record("Synthetic destination guard")
+            try records.save(initial)
+            try sync.select(connection.id); try sync.setAutomaticSyncEnabled(true)
+            await sync.synchronizeAutomatically(connection: connection)
+            var changed = connection
+            changed.endpoint = URL(string: "https://different-fixture.invalid")
+            try records.save(record("Never upload before target confirmation"))
+            Fixture.mutations = []; Fixture.uploadCount = 0
+            for _ in 0..<2 { await sync.synchronize(connection: changed) }
+            check(Fixture.mutations.isEmpty && Fixture.uploadCount == 0, "changing the endpoint blocks repeated attempts")
+            let reopened = try CloudSyncStore(records: records, directory: directory)
+            await reopened.synchronizeAutomatically(connection: changed)
+            check(Fixture.mutations.isEmpty, "unapproved endpoint stays blocked after restart")
+            await reopened.refresh(connection: changed)
+            check(Fixture.mutations.isEmpty && reopened.errorMessage != nil, "a view opening or ordinary refresh cannot approve a changed destination")
+            await reopened.refresh(connection: changed, confirmDestinationChange: true)
+            await reopened.synchronizeAutomatically(connection: changed)
+            check(!Fixture.mutations.isEmpty, "explicit refresh authorizes the new destination")
+            Fixture.mutations = []; Fixture.owner = UUID()
+            for _ in 0..<2 { await reopened.synchronize(connection: changed) }
+            check(Fixture.mutations.isEmpty, "changing only the owner also stays blocked")
+            Fixture.owner = originalOwner
+            await reopened.refresh(connection: connection, confirmDestinationChange: true)
+            let returned = try CloudSyncStore(records: records, directory: directory)
+            await returned.synchronizeAutomatically(connection: connection)
+            check(returned.errorMessage == nil, "the last confirmed destination persists when returning to an earlier ledger")
+        }
         do {
             Fixture.reset()
             let (records, sync, directory) = try make("local-cleanup")

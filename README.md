@@ -40,7 +40,7 @@ Tincall 是最低支持 iOS 26 的原生 AI 语音通话 App。支持手机直�
 ### 开始使用
 
 1. **安装手机 App**：从 [最新发布页](https://github.com/chuli1122/Tincall/releases/latest) 下载 `*-selfsign-unsigned.ipa`，按 [自签指南](docs/SELF_SIGN.md) 使用自己的签名凭据重签安装，无需重新编译。需要 iOS 26 或以上的 iPhone，签名工具须正确配置 App／扩展标识及 App Group。也可使用 Mac 和 Xcode 从源码构建。
-2. **配置识别和声音**：在 App 配置 STT／TTS，选择供应商、型号和音色。TTS 的“语音表达提示词”有按型号区分的默认值，也可自行编辑。
+2. **配置识别和声音**：在 App 配置 STT／TTS，选择供应商、型号和音色。TTS 的“语音表达提示词”有按型号区分的默认值，也可自行编辑。首次使用每条外部服务连接前，阅读其接收方与数据说明，并明确允许数据发送；更换地址或供应商后需重新确认。
 3. **配置联系人**：独立模式选模型并填写人物设定；MCP 按 [接入指引](docs/agent_prompt.md) 登记联系人并复制平台配置；后端按 [接口说明](docs/backend_api.md) 准备服务。
 4. **验证一通电话**：先确认服务和模型可达，再检查实际收音、回复、播放、打断和挂断。
 
@@ -163,7 +163,7 @@ Model, speech, and self-hosting costs depend on their respective providers; purc
 ### Get started
 
 1. **Install the iPhone app.** Download `*-selfsign-unsigned.ipa` from the [latest release](https://github.com/chuli1122/Tincall/releases/latest) and follow the [signing guide](docs/setup.en.md#install-a-self-signing-ipa) to re-sign and install it with your own signing credentials, without recompiling. You need an iPhone running iOS 26 or later, and a signing tool that correctly configures the app and extension identifiers and App Group. You can also [build from source](docs/setup.en.md#build-from-source) using a Mac and Xcode.
-2. **Configure recognition and speech.** Follow the [first-call setup](docs/setup.en.md#make-a-first-standalone-call) to add STT and TTS settings in the app, including the provider, model, and voice. TTS expression prompts have model-specific defaults and can be edited.
+2. **Configure recognition and speech.** Follow the [first-call setup](docs/setup.en.md#make-a-first-standalone-call) to add STT and TTS settings in the app, including the provider, model, and voice. TTS expression prompts have model-specific defaults and can be edited. Before using each external service connection, review its recipient and data disclosure and explicitly allow data sharing. A changed address or provider requires confirmation again.
 3. **Configure a contact.** In standalone mode, select a model and enter a persona. For MCP or backend mode, follow [Connect an external AI](docs/setup.en.md#connect-an-external-ai).
 4. **Test a complete call.** Check service and model availability, then verify audio capture, replies, playback, interruption, and hang-up.
 

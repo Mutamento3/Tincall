@@ -26,6 +26,7 @@ final class SpeechConnectionProbe {
         let expected = generation
         operation = Task { [self] in
             do {
+                try DataSharingConsent.require(connection)
                 let credentials = CredentialStore()
                 let key = try credential(apiKey, saved: {
                     guard connection.provider != .appleSpeech else { return nil }

@@ -34,3 +34,14 @@ test('media proxy streams private owner paths and uses the Storage remove contra
   assert.deepEqual(JSON.parse(seen[4].body),{prefixes:[`${owner}/${record}/${asset}`]});
   assert.equal(seen.length,5);
 });
+
+test('a valid but unenrolled Supabase Auth user cannot become a Tincall owner',async()=>{
+  let requests=0;
+  const owner='10000000-0000-4000-8000-000000000001';
+  const store=createSupabaseStore({supabaseURL:'https://fixture.supabase.invalid',publicKey:'public-fixture',serviceKey:'server-fixture',clients:[{token:'configured-phone',owner_id:owner}]},async()=>{
+    requests++;return Response.json({id:'10000000-0000-4000-8000-000000000002'});
+  });
+  assert.deepEqual(await store.authenticate('configured-phone'),{owner_id:owner,contact_id:null});
+  await assert.rejects(store.authenticate('synthetic-supabase-access-token'),{code:'unauthorized',status:401});
+  assert.equal(requests,0,'unknown tokens must not fall back to Supabase login');
+});

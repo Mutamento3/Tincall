@@ -76,7 +76,7 @@ export function createMCPOAuth({store,baseURL}) {
       if(pending.denied)return authorizationResponse(pending,'access_denied');
       if(pending.code)return authorizationResponse(pending);
       const code=pending.user_code.slice(0,4)+'-'+pending.user_code.slice(4);
-      return new Response(`Tincall · 授权 ChatGPT\n\n一次性授权码：${code}\n\n1. 打开 Tincall，在设置中打开这条云端连接。\n2. 进入「ChatGPT 授权」，输入上面的授权码。\n3. 选择允许访问的联系人，确认授权。\n4. 回到本页面刷新，继续连接 ChatGPT。\n\n授权码 10 分钟内有效。只授权你刚刚发起的连接。\n\nOpen this cloud connection in Tincall settings → ChatGPT authorization. Enter ${code}, choose a contact and approve, then refresh this page. Expires in 10 minutes.`,{headers:{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'}});
+      return new Response(`Tincall · 授权 ChatGPT\n\n一次性授权码：${code}\n\n1. 打开 Tincall，在设置中打开这条云端连接。\n2. 进入「ChatGPT 授权」，输入上面的授权码。\n3. 选择允许访问的联系人，确认授权。\n4. 回到本页面刷新，继续连接 ChatGPT。\n\n授权码 10 分钟内有效。只授权你刚刚发起的连接。不要输入别人发给你的授权码，也不要替别人批准授权。\n\nOpen this cloud connection in Tincall settings → ChatGPT authorization. Enter ${code}, choose a contact and approve, then refresh this page. Expires in 10 minutes. Never enter a code sent by someone else or approve a connection on their behalf.`,{headers:{'Content-Type':'text/plain; charset=utf-8','Cache-Control':'no-store','Referrer-Policy':'no-referrer','X-Content-Type-Options':'nosniff'}});
     }
     if(path==='/oauth/revoke'){
       check(request.method==='POST','invalid_request',405);const p=await body(request);
@@ -108,7 +108,7 @@ export function createMCPOAuth({store,baseURL}) {
     const p=await body(request,true);const code=normalizeCode(p.user_code);check(/^[A-HJ-NP-Z2-9]{8}$/.test(code));
     const pending=await store.oauthCommand('request.get',{user_code:code});check(pending && !pending.code && !pending.denied,'expired_request',410);
     const {bindings}=await store.mcpRoleCommand(principal.owner_id,'list');
-    if(path.endsWith('/lookup'))return response({user_code:code,client_name:'ChatGPT',contacts:bindings.map(b=>({contact_id:b.contact_id,display_name:b.display_name}))});
+    if(path.endsWith('/lookup'))return response({user_code:code,client_name:'ChatGPT',requested_at:new Date(Date.parse(pending.expires_at)-600000).toISOString(),contacts:bindings.map(b=>({contact_id:b.contact_id,display_name:b.display_name}))});
     check(['approve','deny'].includes(p.decision));
     if(p.decision==='approve')check(bindings.some(b=>b.contact_id===p.contact_id),'invalid_contact');
     const decided=await store.oauthCommand('request.decide',{user_code:code,owner_id:principal.owner_id,contact_id:p.decision==='approve'?p.contact_id:null,denied:p.decision==='deny',code:opaque('tcoc_')});
