@@ -117,6 +117,7 @@ App 中打开“设置 → Tincall 云端 → 部署或更新服务”，用自�
 - [MCP 工具参数与行为](docs/mcp.md)
 - [后端 HTTP 协议](docs/backend_api.md)
 - [图片消息](docs/message_images.md)
+- [开发与测试：环境、命令及验证范围](connector/README.md#checks-and-current-limits)
 - [第三方组件与素材](docs/third_party.md)
 
 ### 反馈
@@ -240,6 +241,7 @@ The [English setup guide](docs/setup.en.md) covers signing, a first call, connec
 - [MCP tool parameters and behavior](docs/mcp.md)
 - [Backend HTTP protocol](docs/backend_api.md)
 - [Image messages](docs/message_images.md)
+- [Development and testing: environment, commands, and scope](connector/README.md#checks-and-current-limits)
 - [Third-party components and assets](docs/third_party.md)
 
 ### Feedback

@@ -1,9 +1,7 @@
 import SwiftUI
 
 struct CloudDeploymentGuide<NextSteps: View>: View {
-    // Set the public README section URL when the public repository is published.
-    // Keep it unset rather than linking to the private development repository.
-    private let deploymentGuideURL: URL? = nil
+    private let deploymentGuideURL = URL(string: "https://github.com/chuli1122/Tincall/blob/main/connector/README.md")
     let connectExisting: Bool
     let onConnect: (ConnectionProfile, String) async throws -> Void
     let nextSteps: NextSteps
