@@ -49,6 +49,18 @@ test('SQLite upgrades missing voice columns without losing calls, receipts, or m
   f.restart();assert.equal((await f.store.claimVoiceInstructions(owner,call)).voice_instructions,null);
 });
 
+test('SQLite adds MCP wait preferences while retaining enrolled identities and credentials',async t=>{
+  const f=fixture(t),role={role_id:crypto.randomUUID(),contact_id:'synthetic',display_name:'Synthetic',token:'tcmcp_'+'a'.repeat(64)};
+  const enrolled=await f.store.mcpRoleCommand(owner,'upsert',role);
+  const db=new DatabaseSync(f.path);db.exec('ALTER TABLE tincall_mcp_roles DROP COLUMN mcp_wait_timeout_seconds');db.close();
+  f.restart();
+  const saved=await f.store.mcpRoleCommand(owner,'upsert',role);
+  assert.equal(saved.token,enrolled.token);
+  assert.equal(saved.token_created,false);
+  assert.equal(saved.mcp_wait_timeout_seconds,120);
+  assert.equal((await f.store.mcpRoleCommand(owner,'binding',{contact_id:'synthetic'})).binding.mcp_wait_timeout_seconds,120);
+});
+
 test('SQLite voice claim is atomic across processes and prompt retries never reset it',async t=>{
   const f=fixture(t);const call=crypto.randomUUID();
   await f.store.command(owner,'call.incoming',mutation({call_id:call,contact_id:'tools',source:'mcp'}));
